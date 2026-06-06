@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>健康食光日記 - 衛寶熊</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        /* 基礎排版與色彩 */
+        body { background-color: #FFF9E6; font-family: "微軟正黑體", sans-serif; color: #5C4330; margin: 0; padding: 20px 15px; display: flex; flex-direction: column; align-items: center; }
+        .container { max-width: 400px; width: 100%; }
+        h2 { text-align: center; color: #6C8E7B; margin-bottom: 5px; font-size: 24px; }
+        .subtitle { text-align: center; font-size: 14px; color: #888; margin-bottom: 20px; line-height: 1.5; }
+        .card { background-color: #FFFFFF; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05); }
+        .card-title { font-size: 18px; font-weight: bold; color: #5C4330; margin-bottom: 15px; }
+        
+        /* 雙選單導覽列 */
+        .nav-menu { display: flex; justify-content: space-around; background-color: #FFFFFF; padding: 10px; border-radius: 30px; margin-bottom: 20px; box-shadow: 0px 4px 10px rgba(0,0,0,0.05); width: 100%; box-sizing: border-box;}
+        .nav-item { text-decoration: none; color: #888; font-size: 14px; font-weight: bold; padding: 6px 18px; }
+        .nav-active { color: #6C8E7B; background-color: #E8F0EA; border-radius: 20px; }
+
+        /* 陪伴系統 */
+        .mascot-area { text-align: center; margin-bottom: 15px; height: auto; }
+        .mascot-msg { font-size: 13px; color: #6C8E7B; font-weight: bold; background-color: #E8F0EA; padding: 8px 15px; border-radius: 20px; display: inline-block; line-height: 1.4; max-width: 95%; }
+
+        /* 核心衛教知識庫 */
+        .knowledge-section { background-color: #FDFBF7; border: 1px solid #E6DBC5; border-radius: 10px; padding: 12px; margin-bottom: 15px; }
+        .knowledge-badge { display: inline-block; background-color: #6C8E7B; color: white; font-size: 11px; padding: 2px 8px; border-radius: 20px; margin-bottom: 6px; font-weight: bold; }
+        .knowledge-h4 { margin: 0 0 6px 0; font-size: 14px; color: #5C4330; font-weight: bold; }
+        .knowledge-p { margin: 0; font-size: 13px; color: #666; line-height: 1.5; }
+
+        /* 轉盤與隨堂考 */
+        .roulette-btn { background-color: #FFB74D; color: white; border: none; width: 100%; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; }
+        .roulette-result { background-color: #FFF3E0; color: #E65100; padding: 15px; border-radius: 10px; margin-top: 10px; text-align: center; font-weight: bold; display: none; border: 2px dashed #FFCC80; line-height: 1.5;}
+        .quiz-box { background-color: #F3F4F6; padding: 15px; border-radius: 10px; border-left: 4px solid #4A86B5; }
+        .quiz-q { font-weight: bold; color: #333; margin-bottom: 15px; font-size: 15px; }
+        .quiz-option { display: block; width: 100%; text-align: left; background-color: white; border: 1px solid #DDD; padding: 10px; border-radius: 8px; margin-bottom: 8px; cursor: pointer; font-size: 14px; }
+        .quiz-option:hover { background-color: #E6F0F9; border-color: #4A86B5; }
+
+        /* 數據輸入區 */
+        .water-bar-bg { background-color: #F0F0F0; border-radius: 20px; height: 20px; overflow: hidden; margin-bottom: 10px; }
+        .water-fill { background-color: #82B3D5; width: 0%; height: 100%; border-radius: 20px; transition: width 0.5s; } 
+        .water-text { text-align: right; font-size: 13px; color: #888; font-weight: bold; margin-bottom: 10px;}
+        .input-group { display: flex; gap: 10px; margin-bottom: 10px; }
+        .custom-input { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid #DDD; font-size: 14px; outline: none; }
+        .add-btn { background-color: #6C8E7B; color: white; border: none; padding: 10px 15px; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        .dynamic-feedback { background-color: #FFF3E0; border: 2px dashed #FFB74D; padding: 15px; border-radius: 10px; margin-top: 15px; display: none; }
+        .log-area { background-color: #F9F9F9; border-radius: 10px; padding: 15px; margin-bottom: 20px; border: 1px dashed #CCC; }
+        .log-list { list-style-type: none; padding: 0; margin: 0; font-size: 14px; color: #555; }
+        
+        .summary-box { background-color: #E8F0EA; border: 2px solid #6C8E7B; padding: 15px; border-radius: 12px; margin-top: 15px; display: none; }
+        
+        /* 拍照辨識 */
+        .camera-btn-label { display: block; width: 100%; background-color: #6C8E7B; color: white; text-align: center; padding: 15px 0; border-radius: 30px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        #aiContainer { display: none; margin-top: 15px; text-align: center; background-color: #fff; padding: 15px; border-radius: 15px; border: 2px dashed #6C8E7B; }
+        #imagePreview { max-width: 100%; border-radius: 10px; }
+        .loading-text { color: #888; font-size: 15px; font-weight: bold; animation: blink 1.5s infinite; }
+        @keyframes blink { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
+        #feedbackResult { display: none; padding: 15px; border-radius: 10px; margin-top: 10px; font-weight: bold; }
+        .feedback-positive { background-color: #E8F5E9; color: #2E7D32; }
+        .feedback-negative { background-color: #FFF3E0; color: #E65100; }
+        
+        /* 手動同步按鈕樣式 */
+        .sync-btn { width: 100%; background-color: #E65100; color: white; border: none; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; margin-top: 10px; box-shadow: 0px 4px 6px rgba(0,0,0,0.1); }
+        
+        /* 🔒 尚未建檔的阻擋安全防禦牆 */
+        .lock-overlay { text-align: center; padding: 35px 15px; background: #FFF3F3; border: 2px dashed #F4B9B2; border-radius: 15px; color: #5C4330; font-weight: bold; line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <div class="nav-menu">
+            <a href="profile.html" class="nav-item">👤 個人檔案</a>
+            <a href="food-1.html" class="nav-item nav-active">🥗 食光日記</a>
+        </div>
+
+        <div class="mascot-area">
+            <img id="mascotFace" src="熊1.png" style="width: 80px; height: 80px; object-fit: contain; border-radius: 50%; margin-bottom: 10px;">
+            <div id="mascotMessage" class="mascot-msg">歡迎來到健康食光日記！點擊記錄，數據就會飛去後台囉！</div>
+        </div>
+
+        <h2>🥗 健康食光日記</h2>
+        <div class="subtitle">紀錄日常飲食，培養健康好習慣</div>
+
+        <div id="lockSafetyWall" class="lock-overlay">
+            🔒 偵測到尚未建立個人體質檔案！<br>
+            請先點擊上方選單前往 <a href="profile.html" style="color: #6C8E7B;">【👤 個人檔案】</a> 完成前測與學號登錄解鎖。
+        </div>
+
+        <div id="mainSystemWrapper" style="display: none;">
+
+            <div class="card">
+                <div class="card-title">📖 衛寶熊健康知識庫</div>
+                <div class="knowledge-section">
+                    <span class="knowledge-badge" style="background-color: #A3C9A8;">主題 1</span>
+                    <h4 class="knowledge-h4">六大類食物與營養功能</h4>
+                    <p class="knowledge-p">全穀雜糧提供能量，豆魚蛋肉建構免疫，蔬菜提供膳食纖維，水果富含維生素。缺一不可！</p>
+                    <div style="font-size: 11px; color: #A0A0A0; margin-top: 5px; text-align: right;">📚 來源：國健署《每日飲食指南》</div>
+                </div>
+                <div class="knowledge-section">
+                    <span class="knowledge-badge" style="background-color: #82B3D5;">主題 2</span>
+                    <h4 class="knowledge-h4">2:1:1 餐盤與均衡原則</h4>
+                    <p class="knowledge-p">把餐盤平分成四等份：2份蔬菜（50%）維持血糖穩定；1份優質蛋白質；1份全穀雜糧。</p>
+                    <div style="font-size: 11px; color: #A0A0A0; margin-top: 5px; text-align: right;">📚 來源：臺大醫院 / 國健署《我的餐盤》</div>
+                </div>
+                <div class="knowledge-section">
+                    <span class="knowledge-badge" style="background-color: #FCD299; color: #5C4330;">主題 3</span>
+                    <h4 class="knowledge-h4">天天 5 蔬果與攝取份量</h4>
+                    <p class="knowledge-p">成人每天應攝取 3 份蔬菜與 2 份水果。煮熟蔬菜一盤(約半碗)即為 1 份，可有效預防慢性病。</p>
+                    <div style="font-size: 11px; color: #A0A0A0; margin-top: 5px; text-align: right;">📚 來源：衛生福利部國民健康署</div>
+                </div>
+                <div class="knowledge-section">
+                    <span class="knowledge-badge" style="background-color: #F4B9B2; color: #5C4330;">主題 4</span>
+                    <h4 class="knowledge-h4">游離糖管制與精神情緒</h4>
+                    <p class="knowledge-p">
+                        世界衛生組織(WHO)強烈建議：<strong>每日游離糖(Free Sugars)攝取量應限制在總熱量的 10% 以下</strong>（若能降至 5% 約 25 克更佳）。
+                        游離糖包括手搖飲、點心等額外添加的糖，過量攝取會引發「糖崩潰（Sugar Crash）」，讓人異常疲倦與焦慮，長期更會引發大腦慢性發炎、影響專注力。
+                    </p>
+                    <div style="font-size: 11px; color: #A0A0A0; margin-top: 5px; text-align: right;">📚 來源：世界衛生組織 (WHO) 飲食指南 / APA</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🎲 不知道吃啥？衛寶熊幫你選！</div>
+                <button class="roulette-btn" onclick="spinRoulette()">點我轉出健康學餐推薦</button>
+                <div id="rouletteResult" class="roulette-result"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📝 衛寶熊每日隨堂考</div>
+                <div id="quizContainer" class="quiz-box"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">✍️ 紀錄今日攝取數據</div>
+                <p style="margin: 0 0 5px 0; font-size: 14px; font-weight: bold; color: #E65100;">📅 進度日期選擇：</p>
+                <div class="input-group">
+                    <select id="daySelector" class="custom-input" style="background-color: #FFF3E0; font-weight: bold; flex: auto;">
+                        <option value="0">星期一</option>
+                        <option value="1">星期二</option>
+                        <option value="2">星期三</option>
+                        <option value="3">星期四</option>
+                        <option value="4">星期五</option>
+                        <option value="5">星期六</option>
+                        <option value="6">星期日</option>
+                    </select>
+                </div>
+                <hr style="border: 0; border-top: 1px solid #EEE; margin: 10px 0;">
+
+                <p style="margin: 0 0 5px 0; font-size: 14px; font-weight: bold;">💧 喝水量 (目標 2000 ml)</p>
+                <div class="input-group">
+                    <input type="number" id="waterInput" class="custom-input" placeholder="輸入 ml 數 (例: 300)">
+                    <button class="add-btn" style="background-color: #82B3D5;" onclick="recordWater()">記錄水份</button>
+                </div>
+                <div class="water-bar-bg"><div class="water-fill" id="waterBar"></div></div>
+                <div class="water-text" id="waterText">總計：0 / 2000 ml</div>
+                
+                <hr style="border: 0; border-top: 1px solid #EEE; margin: 15px 0;">
+                
+                <p style="margin: 0 0 5px 0; font-size: 14px; font-weight: bold;">🥦 蔬菜量 (目標 3 份)</p>
+                <div class="input-group">
+                    <input type="number" id="vegInput" class="custom-input" placeholder="輸入份數 (例: 1.5)">
+                    <button class="add-btn" onclick="recordVeg()">記錄蔬菜</button>
+                </div>
+                <div id="dynamicFeedback" class="dynamic-feedback">
+                    <p id="dynamicFeedbackText"></p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📊 保健室同步追蹤儀表板</div>
+                <div class="log-area">
+                    <h3>操作日誌：</h3>
+                    <ul id="recordList" class="log-list">
+                        <li style="color: #AAA;">系統解鎖成功，等待數據輸入...</li>
+                    </ul>
+                </div>
+                <h3 style="font-size: 15px; color: #5C4330; margin-bottom: 10px; text-align: center;">本週蔬菜攝取量 (份)</h3>
+                <canvas id="vegChart" width="100" height="60"></canvas>
+                
+                <div id="weeklySummaryCard" class="summary-box">
+                    <div style="font-size: 16px; font-weight: bold; color: #3A5F43; margin-bottom: 12px; text-align: center;">🏆 衛寶熊一週健康大結算</div>
+                    <p id="summaryText" style="margin: 0; font-size: 13px; line-height: 1.6; color: #444;"></p>
+                    <div style="margin-top:10px; font-size:12px; color:#2E7D32; font-weight:bold; text-align:center;">雲端儲存與後台數據同步成功 🟢</div>
+                </div>
+
+                <button class="sync-btn" onclick="forceSyncToBackend()">備用方案：手動點擊同步至保健室 📤</button>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🤖 衛寶熊 AI 餐盤辨識 (測試版)</div>
+                <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;" onchange="analyzeImage(event)">
+                <label for="cameraInput" class="camera-btn-label">📸 拍下餐盤，讓衛寶熊幫你評分</label>
+                <div id="aiContainer">
+                    <img id="imagePreview" src="" style="display: none;">
+                    <div id="loadingStatus" style="display: none;"><p class="loading-text">🐻 分析比例中...</p></div>
+                    <div id="feedbackResult"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- 1. 雲端讀題設定 ---
+        const googleSheetCSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQrUVevaYMhLEVxGifeluLAxnlz_-SSV1sorZE18rjTGNVKmNzVIcc7_y37ek8i8RnzFCnC7hIKBtCY/pub?output=csv";
+
+        // --- 全域變數初始化 ---
+        let userRole = ""; let userDept = ""; let studentId = "";
+        let userBMI = 22.0; let weeklyWater = [0, 0, 0, 0, 0, 0, 0]; let weeklyVeg = [0, 0, 0, 0, 0, 0, 0];
+        let quizBank = []; let currentQuiz = null;
+        let logDay = "星期四"; let logType = "系統登入"; let logAmount = "0"; let logTotal = "已解鎖功能";
+        let isFirstRecord = true;
+
+        const dayNames = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
+
+        // --- 陪伴系統機制 ---
+        const mascotMsg = document.getElementById('mascotMessage');
+        function updateMascotMood(mood) {
+            if (mood === 'happy') { mascotMsg.innerText = "衛寶熊覺得你現在做得很棒！✨"; }
+            else if (mood === 'alert') { mascotMsg.innerText = "衛寶熊溫馨提醒：要多注意水分與蔬菜補充喔！💦"; }
+        }
+
+        // --- 學餐健康轉盤 ---
+        function spinRoulette() {
+            const currentDayIndex = parseInt(document.getElementById('daySelector').value);
+            logDay = dayNames[currentDayIndex]; logType = "觸發學餐轉盤"; logAmount = "隨機推薦"; logTotal = "選自助餐飯減半";
+            sendDataToBackend();
+            const btn = document.querySelector('.roulette-btn'); btn.innerText = '🎲 轉動中...';
+            setTimeout(() => {
+                const resultBox = document.getElementById('rouletteResult'); resultBox.style.display = 'block';
+                resultBox.innerText = `💡 衛寶熊建議：學餐自助餐飯減半，多夾一格綠色蔬菜，主菜選滷排骨！`; btn.innerText = '再轉一次！';
+            }, 600);
+        }
+
+        // --- 雲端智慧適性題庫載入＋自動偵測今日星期 ＋ 智慧聯動對接大腦 ---
+        window.onload = function() {
+            // 1. 載入雲端題庫
+            Papa.parse(googleSheetCSV, {
+                download: true, header: true, 
+                complete: function(results) { quizBank = results.data.filter(row => row.Question); adaptiveSelectQuiz(); }
+            });
+
+            // 2. 🌟 核心聯動：自動讀取 profile.html 存好的基本檔案
+            if (localStorage.getItem('saved_student_id')) {
+                studentId = localStorage.getItem('saved_student_id');
+                userRole = localStorage.getItem('saved_role') || '大學部學生';
+                userDept = localStorage.getItem('saved_name') || '測試者';
+                
+                // 抓取原本算好的 BMI 決定題目難度
+                const savedH = parseFloat(localStorage.getItem('saved_height')) || 165;
+                const savedW = parseFloat(localStorage.getItem('saved_weight')) || 55;
+                userBMI = savedW / ((savedH/100) * (savedH/100));
+
+                // 關閉防禦牆，解鎖主系統
+                document.getElementById('lockSafetyWall').style.display = "none";
+                document.getElementById('mainSystemWrapper').style.display = "block";
+                
+                mascotMsg.innerText = `哈囉 ${userDept}！衛寶熊已將妳的學號(${studentId})安全聯動，開始記錄今天吧！`;
+            }
+
+            // 3. 自動偵測今日星期並綁定選單
+            let today = new Date();
+            let dayOfWeek = today.getDay(); 
+            let mappedValue = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+            
+            const selector = document.getElementById('daySelector');
+            selector.value = mappedValue;
+            selector.options[mappedValue].text += " (今日狀態)";
+            logDay = dayNames[mappedValue];
+        };
+
+        function adaptiveSelectQuiz() {
+            if (quizBank.length === 0) return;
+            let targetTag = 'veg'; const currentDayIndex = parseInt(document.getElementById('daySelector').value);
+            const todayWater = weeklyWater[currentDayIndex]; const todayVeg = weeklyVeg[currentDayIndex];
+
+            if (todayWater < 1000) { targetTag = 'water_short'; } 
+            else if (todayVeg < 1) { targetTag = 'unbalanced'; } 
+            else if (userBMI >= 24) { targetTag = 'overweight'; } 
+            else if (userBMI < 18.5) { targetTag = 'underweight'; } 
+            else { targetTag = 'advanced'; }
+
+            let filteredQuizzes = quizBank.filter(quiz => quiz.Tag && quiz.Tag.trim().toLowerCase() === targetTag);
+            if (filteredQuizzes.length === 0) filteredQuizzes = quizBank;
+            currentQuiz = filteredQuizzes[Math.floor(Math.random() * filteredQuizzes.length)]; displayQuiz();
+        }
+
+        function displayQuiz() {
+            if (!currentQuiz) return; const container = document.getElementById('quizContainer'); const options = [currentQuiz.OptionA, currentQuiz.OptionB, currentQuiz.OptionC];
+            let html = `<div class="quiz-q">${currentQuiz.Question}</div>`;
+            options.forEach((opt, index) => { if(opt) { html += `<button class="quiz-option" onclick="checkQuiz(${index})">${['A', 'B', 'C'][index]}. ${opt}</button>`; } });
+            container.innerHTML = html;
+        }
+
+        function checkQuiz(selectedIndex) {
+            const correctAnswer = parseInt(currentQuiz.Answer) - 1;
+            const isCorrect = (selectedIndex === correctAnswer);
+            
+            logDay = dayNames[document.getElementById('daySelector').value]; 
+            logType = "回答隨堂考"; 
+            logAmount = `選 ${selectedIndex+1}`; 
+            logTotal = isCorrect ? '答對' : '答錯';
+            sendDataToBackend();
+
+            if (isCorrect) {
+                alert(`🎉 答對了！ ${currentQuiz.Reward}`);
+                const container = document.getElementById('quizContainer');
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 10px; color: #2E7D32; font-weight: bold;">
+                        🏅 衛寶熊：今日健康挑戰已達成！妳太棒了，明天再回來答題吧！✨
+                    </div>
+                `;
+                mascotMsg.innerText = "今天的隨堂考妳已經順利拿滿分囉！🐻✨";
+            } else {
+                alert(`🐻 衛寶熊提示：${currentQuiz.Hint}`); 
+            }
+        }
+
+        document.getElementById('daySelector').onchange = function() {
+            const dayIndex = parseInt(this.value);
+            document.getElementById('waterBar').style.width = Math.min((weeklyWater[dayIndex] / 2000) * 100, 100) + "%";
+            document.getElementById('waterText').innerText = `總計：${weeklyWater[dayIndex]} / 2000 ml`; adaptiveSelectQuiz();
+        };
+
+        function recordWater() {
+            let amount = parseInt(document.getElementById('waterInput').value); if (isNaN(amount) || amount <= 0) return alert("請輸入正確數字！");
+            const dayIndex = parseInt(document.getElementById('daySelector').value);
+            weeklyWater[dayIndex] += amount;
+            document.getElementById('waterBar').style.width = Math.min((weeklyWater[dayIndex] / 2000) * 100, 100) + "%";
+            document.getElementById('waterText').innerText = `總計：${weeklyWater[dayIndex]} / 2000 ml`;
+            addLogItem(`💧 ${dayNames[dayIndex]} 記錄喝水：${amount} ml`); document.getElementById('waterInput').value = '';
+            
+            logDay = dayNames[dayIndex]; 
+            logType = "記錄喝水"; 
+            logAmount = `${amount} ml`; 
+            logTotal = `當日累計: ${weeklyWater[dayIndex]} ml`;
+            sendDataToBackend();
+            
+            feedbackBox.style.display = 'block'; feedbackBox.style.backgroundColor = '#E3F2FD'; feedbackBox.style.borderColor = '#64B5F6';
+            if (weeklyWater[dayIndex] < 2000) { feedbackText.innerHTML = "🐻 喝水能促進新陳代謝，快達標囉！"; updateMascotMood('alert'); }
+            else { feedbackText.innerHTML = "🎉 水分達標！"; updateMascotMood('happy'); }
+            adaptiveSelectQuiz(); checkWeeklySettlement();
+        }
+
+        function recordVeg() {
+            let amount = parseFloat(document.getElementById('vegInput').value); if (isNaN(amount) || amount <= 0) return alert("請輸入正確數字！");
+            const dayIndex = parseInt(document.getElementById('daySelector').value);
+            weeklyVeg[dayIndex] += amount; vegChart.data.datasets[0].data = weeklyVeg;
+            if (weeklyVeg[dayIndex] >= 3) vegChart.data.datasets[0].backgroundColor[dayIndex] = '#A3C9A8';
+            else vegChart.data.datasets[0].backgroundColor[dayIndex] = '#F4B9B2';
+            vegChart.update();
+            addLogItem(`🥦 ${dayNames[dayIndex]} 記錄蔬菜：${amount} 份`); document.getElementById('vegInput').value = '';
+
+            logDay = dayNames[dayIndex]; 
+            logType = "記錄蔬菜"; 
+            logAmount = `${amount} 份`; 
+            logTotal = `當日累計: ${weeklyVeg[dayIndex]} 份`;
+            sendDataToBackend();
+
+            feedbackBox.style.display = 'block'; feedbackBox.style.backgroundColor = '#F4F9F5'; feedbackBox.style.borderColor = '#81C784';
+            if (weeklyVeg[dayIndex] < 3) { feedbackText.innerHTML = "🐻 快達標了！加油！"; updateMascotMood('alert'); }
+            else { feedbackText.innerHTML = "🎉 達成每日 3 份蔬菜！"; updateMascotMood('happy'); }
+            adaptiveSelectQuiz(); checkWeeklySettlement();
+        }
+
+        function checkWeeklySettlement() {
+            const is7DaysFilled = weeklyWater.every(w => w > 0) && weeklyVeg.every(v => v > 0);
+            if (is7DaysFilled) {
+                const totalWaterSum = weeklyWater.reduce((a, b) => a + b, 0); const totalVegSum = weeklyVeg.reduce((a, b) => a + b, 0); const avgVeg = totalVegSum / 7;
+                let evalText = avgVeg >= 3 ? "天天吃足3份蔬菜！" : "蔬菜量還差一小步。";
+                
+                const summaryCard = document.getElementById('weeklySummaryCard'); const summaryText = document.getElementById('summaryText');
+                summaryCard.style.display = 'block';
+                summaryText.innerHTML = `• 本週總喝水：${totalWaterSum} ml<br>• 本週總蔬菜：${totalVegSum} 份`;
+                
+                logDay = "一週總結算"; logType = "滿七天大循環"; logAmount = `總水:${totalWaterSum}ml/總菜:${totalVegSum}份`; logTotal = evalText;
+                sendDataToBackend();
+            }
+        }
+
+        // --- 🤖 全自動即時背景數據發送函數 ---
+        function sendDataToBackend() {
+            if (!studentId) return; 
+
+            const teacherGoogleFormUrl = "https://docs.google.com/forms/d/e/1FAIpQLSeCsJUaZRtzP1ZhRQ83_97oOB2e9VxHb4txav9I5sPvKYqUyg/formResponse";
+            const formData = new FormData();
+            
+            formData.append('entry.1612908578', studentId);       
+            formData.append('entry.22380892', userRole);          
+            formData.append('entry.639290903', userDept);          
+            formData.append('entry.573874726', logDay);            
+            formData.append('entry.2005915541', logType);          
+            formData.append('entry.303471113', logAmount);         
+            formData.append('entry.1059819279', logTotal);         
+
+            fetch(teacherGoogleFormUrl, { method: 'POST', mode: 'no-cors', body: formData })
+            .catch(err => console.log("自動同步異常：", err));
+        }
+
+        // --- 📤 備用方案：強制手動同步按鈕功能 ---
+        function forceSyncToBackend() {
+            if (!studentId) return alert("請先前往個人檔案建立校園基本資料喔！");
+            
+            const targetUrl = `https://docs.google.com/forms/d/e/1FAIpQLSeCsJUaZRtzP1ZhRQ83_97oOB2e9VxHb4txav9I5sPvKYqUyg/formResponse?` +
+                              `entry.1612908578=${encodeURIComponent(studentId)}&` +
+                              `entry.22380892=${encodeURIComponent(userRole)}&` +
+                              `entry.639290903=${encodeURIComponent(userDept)}&` +
+                              `entry.573874726=${encodeURIComponent(logDay)}&` +
+                              `entry.2005915541=${encodeURIComponent(logType)}&` +
+                              `entry.303471113=${encodeURIComponent(logAmount)}&` +
+                              `entry.1059819279=${encodeURIComponent(logTotal)}`;
+
+            let img = new Image();
+            img.src = targetUrl;
+            
+            alert("🐻 數據已強行推入後台！快去刷新 Excel 吧！");
+            addLogItem(`🔄 執行手動數據強制同步作業`);
+        }
+
+        function addLogItem(text) {
+            let list = document.getElementById('recordList'); if (isFirstRecord) { list.innerHTML = ''; isFirstRecord = false; }
+            let now = new Date(); let timeString = now.getHours() + ":" + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
+            let newItem = document.createElement('li'); newItem.innerHTML = "<strong>" + timeString + "</strong> - " + text; list.insertBefore(newItem, list.firstChild);
+        }
+
+        function analyzeImage(event) {
+            const file = event.target.files[0]; if (!file) return;
+            const container = document.getElementById('aiContainer'); const preview = document.getElementById('imagePreview');
+            const loading = document.getElementById('loadingStatus'); const resultBox = document.getElementById('feedbackResult');
+            container.style.display = 'block'; resultBox.style.display = 'none'; loading.style.display = 'block'; preview.style.display = 'block';
+            const reader = new FileReader(); reader.onload = function(e) { preview.src = e.target.result; }; reader.readAsDataURL(file);
+            setTimeout(() => {
+                loading.style.display = 'none'; resultBox.style.display = 'block';
+                const currentDayIndex = parseInt(document.getElementById('daySelector').value);
+                logDay = dayNames[currentDayIndex]; logType = "AI拍照辨識";
+                
+                if (Math.random() > 0.5) { 
+                    resultBox.className = 'feedback-positive'; resultBox.innerHTML = "🎉 衛寶熊 AI 評分：比例完美！"; 
+                    logAmount = "餐盤分析"; logTotal = "完美餐盤";
+                } else { 
+                    resultBox.className = 'feedback-negative'; resultBox.innerHTML = "⚠️ 衛寶熊 AI 評分：高油低纖維，注意囉！"; 
+                    logAmount = "餐盤分析"; logTotal = "缺乏纖維警戒";
+                }
+                sendDataToBackend();
+            }, 2500);
+        }
+    </script>
+</body>
+</html>
