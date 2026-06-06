@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>健康紀錄中心 - 衛寶熊</title>
+    <style>
+        body { background-color: #FFF9E6; font-family: "微軟正黑體", sans-serif; color: #5C4330; margin: 0; padding: 20px 15px; display: flex; flex-direction: column; align-items: center; }
+        .container { max-width: 400px; width: 100%; }
+        h2 { text-align: center; color: #6C8E7B; margin-bottom: 5px; font-size: 24px; }
+        .subtitle { text-align: center; font-size: 13px; color: #888; margin-bottom: 20px; line-height: 1.5; }
+        .card { background-color: #FFFFFF; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05); }
+        .card-title { font-size: 18px; font-weight: bold; color: #5C4330; margin-bottom: 15px; border-bottom: 1px solid #EEE; padding-bottom: 8px; }
+        
+        /* 三選單導覽列 (跨資料夾特化) */
+        .nav-menu { display: flex; justify-content: space-around; background-color: #FFFFFF; padding: 10px; border-radius: 30px; margin-bottom: 20px; box-shadow: 0px 4px 10px rgba(0,0,0,0.05); width: 100%; box-sizing: border-box;}
+        .nav-item { text-decoration: none; color: #888; font-size: 13px; font-weight: bold; padding: 6px 12px; }
+        .nav-active { color: #6C8E7B; background-color: #E8F0EA; border-radius: 20px; }
+
+        /* 陪伴系統 */
+        .mascot-area { text-align: center; margin-bottom: 15px; }
+        .mascot-msg { font-size: 13px; color: #6C8E7B; font-weight: bold; background-color: #E8F0EA; padding: 8px 15px; border-radius: 20px; display: inline-block; line-height: 1.4; max-width: 90%; }
+        
+        /* 數據大型看板 */
+        .grid-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        .stat-box { background-color: #FDFBF7; border: 1px solid #E6DBC5; border-radius: 10px; padding: 10px; text-align: center; }
+        .stat-value { font-size: 18px; font-weight: bold; color: #6C8E7B; margin-top: 4px; }
+        .stat-label { font-size: 11px; color: #888; font-weight: bold; }
+
+        /* 輸入框排版 */
+        .input-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; }
+        .input-label { font-size: 12px; font-weight: bold; color: #5C4330; }
+        .custom-input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #DDD; font-size: 13px; outline: none; box-sizing: border-box; }
+        .add-btn { background-color: #6C8E7B; color: white; border: none; width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; }
+
+        .waist-alert-badge { padding: 12px; border-radius: 10px; font-weight: bold; text-align: left; font-size: 13px; margin-top: 10px; line-height: 1.6;}
+        .badge-safe { background-color: #E8F5E9; color: #2E7D32; border: 1px solid #A3C9A8; }
+        .badge-warning { background-color: #FFF3E0; color: #D84315; border: 1px solid #FFCC80; }
+
+        .lock-overlay { text-align: center; padding: 35px 15px; background: #FFF3F3; border: 2px dashed #F4B9B2; border-radius: 15px; color: #5C4330; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <!-- 🌟 三選單跨資料夾導覽列 (智慧任意門) -->
+        <div class="nav-menu">
+            <a href="../profile/profile-1.html" class="nav-item">👤 個人檔案</a>
+            <a href="dashboard-1.html" class="nav-item nav-active">📈 健康紀錄</a>
+            <a href="../food/food-1.html" class="nav-item">🥗 食光日記</a>
+        </div>
+
+        <div class="mascot-area">
+            <img id="mascotFace" src="../profile/熊1.png" style="width: 75px; height: 75px; object-fit: contain; border-radius: 50%; margin-bottom: 8px;" onerror="this.src='https://placehold.co/75?text=Bear'">
+            <br>
+            <div id="mascotMessage" class="mascot-msg">我是衛寶熊🐻 這裡已經升級為生理指標管理中心，一起溫和建立健康習慣吧！</div>
+        </div>
+
+        <h2>📈 個人健康紀錄中心</h2>
+        <div class="subtitle">追蹤多元生理數據，不警嚇、不威脅，溫和陪伴自我成長</div>
+
+        <div id="lockSafetyWall" class="lock-overlay">
+            🔒 偵測到尚未同步個人體質檔案！<br>
+            請先由選單前往【👤 個人檔案】完成第一步建檔，即可解鎖查看。
+        </div>
+
+        <div id="dashboardCore" style="display: none;">
+            
+            <div class="card" style="border: 1px solid #FFD54F; background-color: #FFFDE7;">
+                <div class="card-title" style="font-size: 16px; color: #F57F17;">📝 登記日常進階生理指標</div>
+                <div class="input-group">
+                    <span class="input-label">💓 收縮壓 / 舒張壓 (mmHg)</span>
+                    <input type="text" id="inputBP" class="custom-input" placeholder="例如: 120/80">
+                    
+                    <span class="input-label">🔥 今日估算攝取總熱量 (kcal)</span>
+                    <input type="number" id="inputCalories" class="custom-input" placeholder="例如: 1800">
+                    
+                    <span class="input-label">💪 肌肉量 (kg)</span>
+                    <input type="number" id="inputMuscle" class="custom-input" placeholder="例如: 24.5">
+                    
+                    <span class="input-label">📉 脂肪百分比 - 體脂率 (%)</span>
+                    <input type="number" id="inputFat" class="custom-input" placeholder="例如: 22.3">
+                </div>
+                <button class="add-btn" style="background-color: #F57F17;" onclick="saveAdvancedStats()">儲存追蹤數據並發送後台 💾</button>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📊 當前生理指標總覽</div>
+                <div class="grid-stats">
+                    <div class="stat-box"><div class="stat-label">📐 身高</div><div id="showHeight" class="stat-value">--</div></div>
+                    <div class="stat-box"><div class="stat-label">⚖️ 體重</div><div id="showWeight" class="stat-value">--</div></div>
+                    <div class="stat-box"><div class="stat-label">📊 BMI / 腰圍</div><div id="showBMIVals" class="stat-value">--</div></div>
+                    <div class="stat-box"><div class="stat-label">💓 歷史血壓</div><div id="showBP" class="stat-value">--</div></div>
+                    <div class="stat-box"><div class="stat-label">💪 肌肉量</div><div id="showMuscle" class="stat-value">--</div></div>
+                    <div class="stat-box"><div class="stat-label">✨ 體脂率</div><div id="showFat" class="stat-value">--</div></div>
+                </div>
+
+                <div id="waistLightBox" class="waist-alert-badge"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            if (localStorage.getItem('saved_student_id')) {
+                document.getElementById('lockSafetyWall').style.display = "none";
+                document.getElementById('dashboardCore').style.display = "block";
+                refreshDashboardView();
+            }
+        };
+
+        function refreshDashboardView() {
+            const name = localStorage.getItem('saved_name') || '同學';
+            const h = parseFloat(localStorage.getItem('saved_height'));
+            const w = parseFloat(localStorage.getItem('saved_weight'));
+            const waist = parseFloat(localStorage.getItem('saved_waist'));
+            
+            const bp = localStorage.getItem('saved_bp') || '--';
+            const muscle = localStorage.getItem('saved_muscle') || '--';
+            const fat = localStorage.getItem('saved_fat') || '--';
+
+            document.getElementById('mascotMessage').innerText = `哈囉 ${name}，衛寶熊已調出妳的最新多維度校園健康軌跡囉！✨`;
+
+            document.getElementById('showHeight').innerText = h + " cm";
+            document.getElementById('showWeight').innerText = w + " kg";
+            document.getElementById('showBMIVals').innerText = (w/((h/100)*(h/100))).toFixed(1) + " / " + waist + "cm";
+            document.getElementById('showBP').innerText = bp + " mmHg";
+            document.getElementById('showMuscle').innerText = muscle === '--' ? '--' : muscle + " kg";
+            document.getElementById('showFat').innerText = fat === '--' ? '--' : fat + " %";
+
+            const bmi = w / ((h/100)*(h/100));
+            const lightBox = document.getElementById('waistLightBox');
+            let isWaistHigh = (waist >= 80);
+            let isBmiHigh = (bmi >= 24);
+
+            if (!isBmiHigh && !isWaistHigh) {
+                lightBox.className = "waist-alert-badge badge-safe";
+                lightBox.innerHTML = `🟢 <strong>衛寶熊溫和體質判定：</strong><br>當前各項核心防線皆符合標準範圍！建議繼續維持「2:1:1均衡餐盤」與適量喝水，為身體存好充沛體能。`;
+            } else if (!isBmiHigh && isWaistHigh) {
+                lightBox.className = "waist-alert-badge badge-warning";
+                lightBox.innerHTML = `🟡 <strong>衛寶熊溫馨小叮嚀：</strong><br>妳的 BMI 雖然在標準區間，但腰圍數據提示可能屬於『隱性泡芙體質』(體脂肪或內臟脂肪儲備較高)。別擔心！這不是威脅，我們可以透過在『食光日記』中多夾一格綠色高纖蔬菜、並搭配微幅的「肌力訓練」來幫助新陳代謝平穩運作喔！`;
+            } else {
+                lightBox.className = "waist-alert-badge badge-warning";
+                lightBox.innerHTML = `🟠 <strong>衛寶熊溫和改善指南：</strong><br>數據顯示目前身體能量儲備較為豐沛。為了讓心血管和代謝泵浦能更輕鬆、無負擔地運作，不需要盲目節食追求病態瘦，我們建議採取『減法飲食』(如少淋滷汁、去皮)，並配合規律的動態生活，一起溫和地調整體位狀況。`;
+            }
+        }
+
+        function saveAdvancedStats() {
+            const bp = document.getElementById('inputBP').value.trim();
+            const cal = document.getElementById('inputCalories').value.trim();
+            const muscle = document.getElementById('inputMuscle').value.trim();
+            const fat = document.getElementById('inputFat').value.trim();
+
+            if(!bp || !cal || !muscle || !fat) return alert("請完整輸入本次量取的生理指標喔！");
+
+            localStorage.setItem('saved_bp', bp);
+            localStorage.setItem('saved_cal', cal);
+            localStorage.setItem('saved_muscle', muscle);
+            localStorage.setItem('saved_fat', fat);
+
+            refreshDashboardView();
+
+            const id = localStorage.getItem('saved_student_id');
+            const role = localStorage.getItem('saved_role');
+            const name = localStorage.getItem('saved_name');
+            
+            let today = new Date();
+            const dayNames = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+            let currentDayName = dayNames[today.getDay()];
+
+            const googleFormUrl = "https://docs.google.com/forms/d/e/1FAIpQLSeCsJUaZRtzP1ZhRQ83_97oOB2e9VxHb4txav9I5sPvKYqUyg/formResponse";
+            const formData = new FormData();
+            formData.append('entry.1612908578', id);
+            formData.append('entry.22380892', role);
+            formData.append('entry.639290903', name);
+            formData.append('entry.573874726', currentDayName);
+            formData.append('entry.2005915541', "進階指標紀錄");
+            formData.append('entry.303471113', `熱量:${cal}kcal/體脂:${fat}%`);
+            formData.append('entry.1059819279', `血壓:${bp}/肌肉:${muscle}kg`);
+
+            fetch(googleFormUrl, { method: 'POST', mode: 'no-cors', body: formData });
+            alert("🐻 數據已全自動同步上傳至校園管理雲端試算表囉！");
+        }
+    </script>
+</body>
+</html>
