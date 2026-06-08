@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>視覺小說引擎</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@300;400;500&display=swap');
+
+  :root {
+    --primary: #1a1a2e;
+    --secondary: #16213e;
+    --accent: #e94560;
+    --accent2: #0f3460;
+    --gold: #f5a623;
+    --text-light: #e8e8f0;
+    --text-dim: #9090aa;
+    --dialog-bg: rgba(10,10,25,0.92);
+    --dialog-border: rgba(233,69,96,0.4);
+    --choice-bg: rgba(15,52,96,0.85);
+    --choice-hover: rgba(233,69,96,0.25);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans TC', sans-serif;
+    background: #000;
+    color: var(--text-light);
+    overflow: hidden;
+    height: 100vh;
+    user-select: none;
+  }
+
+  #game-container {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Canvas Layer ── */
+  #bg-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+  }
+
+  /* ── Character Layer ── */
+  #char-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .char-sprite {
+    position: absolute;
+    bottom: 180px;
+    width: 280px;
+    height: 380px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    transition: all 0.4s cubic-bezier(0.25,0.8,0.25,1);
+    opacity: 0;
+  }
+
+  .char-sprite.visible { opacity: 1; }
+  .char-sprite.pos-left { left: 5%; }
+  .char-sprite.pos-right { right: 5%; }
+  .char-sprite.pos-top { top: 10px; bottom: auto; left: 50%; transform: translateX(-50%); }
+  .char-sprite.pos-bottom { bottom: 200px; left: 50%; transform: translateX(-50%); }
+
+  .char-sprite img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: bottom;
+    filter: drop-shadow(0 10px 30px rgba(0,0,0,0.8));
+    transition: filter 0.3s;
+  }
+
+  .char-sprite.dimmed img {
+    filter: drop-shadow(0 10px 30px rgba(0,0,0,0.8)) brightness(0.45) saturate(0.4);
+  }
+
+  .char-sprite .char-name-tag {
+    position: absolute;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 3px 12px;
+    border-radius: 20px;
+    white-space: nowrap;
+    opacity: 0.9;
+  }
+
+  /* ── Dialog Box ── */
+  #dialog-box {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    padding: 0 40px 30px;
+    transition: opacity 0.3s;
+  }
+
+  #dialog-inner {
+    background: var(--dialog-bg);
+    border: 1px solid var(--dialog-border);
+    border-radius: 12px;
+    padding: 20px 28px 16px;
+    backdrop-filter: blur(16px);
+    position: relative;
+    box-shadow: 0 -4px 40px rgba(233,69,96,0.12), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  #speaker-name {
+    position: absolute;
+    top: -16px;
+    left: 24px;
+    background: linear-gradient(90deg, var(--accent), #c0392b);
+    color: #fff;
+    font-family: 'Noto Serif TC', serif;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 4px 20px;
+    border-radius: 8px 8px 0 0;
+    letter-spacing: 2px;
+    min-width: 80px;
+    text-align: center;
+  }
+
+  #dialog-text {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 18px;
+    line-height: 1.8;
+    color: var(--text-light);
+    min-height: 60px;
+    letter-spacing: 0.5px;
+  }
+
+  #dialog-cursor {
+    display: inline-block;
+    width: 10px;
+    height: 18px;
+    background: var(--accent);
+    margin-left: 4px;
+    vertical-align: middle;
+    animation: blink 0.8s infinite;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  #dialog-cursor.show { opacity: 1; }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  #dialog-hint {
+    text-align: right;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    letter-spacing: 1px;
+  }
+
+  /* ── Choices ── */
+  #choice-container {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 20px;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  #choice-container.visible {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .choice-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .choice-btn {
+    background: var(--choice-bg);
+    border: 1px solid rgba(233,69,96,0.35);
+    border-radius: 8px;
+    color: var(--text-light);
+    font-family: 'Noto Serif TC', serif;
+    font-size: 17px;
+    padding: 14px 48px;
+    cursor: pointer;
+    width: min(500px, 90%);
+    text-align: center;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .choice-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--choice-hover);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .choice-btn:hover::before { opacity: 1; }
+  .choice-btn:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .choice-btn:active { transform: scale(0.98); }
+
+  /* ── HUD ── */
+  #hud {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 30;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .hud-btn {
+    background: rgba(10,10,25,0.7);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-size: 12px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    backdrop-filter: blur(8px);
+    letter-spacing: 1px;
+  }
+
+  .hud-btn:hover { color: #fff; border-color: var(--accent); }
+
+  #fps-display {
+    background: rgba(10,10,25,0.7);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-size: 11px;
+    font-family: monospace;
+    padding: 6px 12px;
+    backdrop-filter: blur(8px);
+  }
+
+  /* ── Settings Panel ── */
+  #settings-panel {
+    position: absolute;
+    top: 60px;
+    right: 16px;
+    z-index: 40;
+    background: rgba(10,10,25,0.95);
+    border: 1px solid rgba(233,69,96,0.3);
+    border-radius: 12px;
+    padding: 20px;
+    width: 240px;
+    backdrop-filter: blur(20px);
+    display: none;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  }
+
+  #settings-panel.visible { display: block; }
+
+  .setting-row {
+    margin-bottom: 16px;
+  }
+
+  .setting-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .setting-label span { color: var(--gold); font-family: monospace; }
+
+  input[type=range] {
+    width: 100%;
+    height: 4px;
+    -webkit-appearance: none;
+    background: rgba(255,255,255,0.15);
+    border-radius: 2px;
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+
+  /* ── Title Screen ── */
+  #title-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    transition: opacity 0.8s;
+  }
+
+  #title-screen.fade-out { opacity: 0; pointer-events: none; }
+
+  .title-canvas-wrap {
+    position: absolute;
+    inset: 0;
+  }
+
+  .title-canvas-wrap canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  .title-content {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+  }
+
+  .title-main {
+    font-family: 'Noto Serif TC', serif;
+    font-size: clamp(36px, 6vw, 72px);
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 8px;
+    text-shadow: 0 0 40px rgba(233,69,96,0.6);
+    margin-bottom: 8px;
+  }
+
+  .title-sub {
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 4px;
+    margin-bottom: 60px;
+  }
+
+  .start-btn {
+    background: transparent;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    color: #fff;
+    font-family: 'Noto Serif TC', serif;
+    font-size: 18px;
+    padding: 14px 60px;
+    cursor: pointer;
+    letter-spacing: 4px;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .start-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s;
+    z-index: -1;
+  }
+
+  .start-btn:hover::after { transform: scaleX(1); }
+  .start-btn:hover { box-shadow: 0 0 30px rgba(233,69,96,0.4); }
+
+  /* ── End Screen ── */
+  #end-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 45;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.92);
+    text-align: center;
+    gap: 18px;
+  }
+
+  #end-screen.visible { display: flex; }
+
+  .end-title {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 28px;
+    color: var(--gold);
+    letter-spacing: 4px;
+  }
+
+  .score-ring-wrap {
+    position: relative;
+    width: 180px;
+    height: 180px;
+  }
+
+  .score-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #score-num {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 52px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1;
+  }
+
+  .score-max-label {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  .score-rank {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 3px;
+  }
+
+  .score-msg {
+    font-size: 14px;
+    color: var(--text-dim);
+    max-width: 320px;
+    line-height: 1.7;
+    letter-spacing: 1px;
+  }
+
+  /* Score HUD */
+  #score-hud {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 30;
+    background: rgba(10,10,25,0.75);
+    border: 1px solid rgba(245,166,35,0.3);
+    border-radius: 8px;
+    padding: 6px 16px;
+    font-size: 13px;
+    color: var(--gold);
+    font-family: 'Noto Serif TC', serif;
+    letter-spacing: 1px;
+    backdrop-filter: blur(8px);
+    transition: transform 0.15s;
+  }
+
+  #score-hud.bump {
+    transform: scale(1.2);
+    color: #fff;
+  }
+
+  /* Feedback toast */
+  #feedback-toast {
+    position: absolute;
+    top: 55px;
+    left: 16px;
+    z-index: 31;
+    font-size: 13px;
+    font-family: 'Noto Serif TC', serif;
+    padding: 5px 14px;
+    border-radius: 6px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    letter-spacing: 1px;
+  }
+
+  #feedback-toast.correct {
+    background: rgba(39,174,96,0.85);
+    color: #fff;
+  }
+
+  #feedback-toast.wrong {
+    background: rgba(192,57,43,0.85);
+    color: #fff;
+  }
+
+  #feedback-toast.show { opacity: 1; }
+
+  .replay-btn {
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-family: 'Noto Serif TC', serif;
+    font-size: 16px;
+    padding: 12px 40px;
+    cursor: pointer;
+    letter-spacing: 2px;
+    transition: transform 0.2s;
+    margin-top: 8px;
+  }
+
+  .replay-btn:hover { transform: scale(1.05); }
+
+  /* ── Script Editor ── */
+  #script-editor {
+    position: absolute;
+    inset: 0;
+    z-index: 60;
+    background: rgba(5,5,15,0.98);
+    backdrop-filter: blur(20px);
+    display: none;
+    flex-direction: column;
+    padding: 20px;
+  }
+
+  #script-editor.visible { display: flex; }
+
+  .editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .editor-title {
+    font-size: 14px;
+    color: var(--gold);
+    letter-spacing: 2px;
+    font-family: monospace;
+  }
+
+  .editor-close {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 4px 12px;
+    font-size: 12px;
+    transition: all 0.2s;
+  }
+
+  .editor-close:hover { border-color: var(--accent); color: #fff; }
+
+  #script-textarea {
+    flex: 1;
+    background: rgba(10,10,30,0.9);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: #a8d8a8;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    padding: 16px;
+    resize: none;
+    outline: none;
+    tab-size: 2;
+  }
+
+  #script-textarea:focus { border-color: rgba(233,69,96,0.4); }
+
+  .editor-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .editor-btn {
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+  }
+
+  .editor-btn-primary {
+    background: var(--accent);
+    border: none;
+    color: #fff;
+  }
+
+  .editor-btn-primary:hover { background: #c0392b; }
+
+  .editor-btn-secondary {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.2);
+    color: var(--text-dim);
+  }
+
+  .editor-btn-secondary:hover { border-color: var(--accent); color: #fff; }
+
+  .editor-hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    line-height: 1.6;
+  }
+
+  .editor-hint code {
+    color: #7ec8e3;
+    background: rgba(255,255,255,0.07);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+</style>
+</head>
+<body>
+
+<div id="game-container">
+  <canvas id="bg-canvas"></canvas>
+  <img id="bg-img" src="" alt="" draggable="false" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;opacity:0;transition:opacity 0.6s;">
+
+  <div id="char-layer">
+    <div class="char-sprite" id="char-left">
+      <img id="char-img-left" src="" alt="" draggable="false">
+    </div>
+    <div class="char-sprite" id="char-right">
+      <img id="char-img-right" src="" alt="" draggable="false">
+    </div>
+    <div class="char-sprite" id="char-top">
+      <img id="char-img-top" src="" alt="" draggable="false">
+    </div>
+    <div class="char-sprite" id="char-bottom">
+      <img id="char-img-bottom" src="" alt="" draggable="false">
+    </div>
+  </div>
+
+  <div id="dialog-box" style="display:none">
+    <div id="dialog-inner">
+      <div id="speaker-name">旁白</div>
+      <div id="dialog-text"><span id="dialog-text-content"></span><span id="dialog-cursor" class="show"></span></div>
+      <div id="dialog-hint">點擊繼續 ▶</div>
+    </div>
+  </div>
+
+  <div id="choice-container">
+    <div class="choice-label">— 做出選擇 —</div>
+  </div>
+
+  <div id="hud">
+    <div id="fps-display">FPS: 60</div>
+    <button class="hud-btn" onclick="toggleSettings()">⚙ 設定</button>
+    <button class="hud-btn" onclick="toggleEditor()">📝 劇本</button>
+  </div>
+
+  <div id="score-hud">❤️ 健康分數：<span id="score-live">0</span></div>
+  <div id="feedback-toast"></div>
+
+  <div id="settings-panel">
+    <div class="setting-row">
+      <div class="setting-label">動畫 FPS <span id="fps-val">60</span></div>
+      <input type="range" min="10" max="120" value="60" id="fps-slider" oninput="setFPS(this.value)">
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">打字速度 <span id="speed-val">40</span> ms</div>
+      <input type="range" min="10" max="120" value="40" id="speed-slider" oninput="setTypeSpeed(this.value)">
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">背景粒子密度 <span id="particle-val">60</span></div>
+      <input type="range" min="10" max="200" value="60" id="particle-slider" oninput="setParticles(this.value)">
+    </div>
+  </div>
+
+  <div id="title-screen">
+    <div class="title-canvas-wrap"><canvas id="title-canvas"></canvas></div>
+    <div class="title-content">
+      <div class="title-main" id="game-title">星海物語</div>
+      <div class="title-sub" id="game-subtitle">A VISUAL NOVEL ENGINE</div>
+      <button class="start-btn" onclick="startGame()">開始遊戲</button>
+    </div>
+  </div>
+
+  <div id="end-screen">
+    <div class="end-title" id="end-title-text">— 測驗結束 —</div>
+    <div class="score-ring-wrap">
+      <canvas id="score-ring" width="180" height="180"></canvas>
+      <div class="score-center">
+        <div id="score-num">0</div>
+        <div class="score-max-label" id="score-max-label">/ 0 分</div>
+      </div>
+    </div>
+    <div id="score-rank" class="score-rank"></div>
+    <div id="score-breakdown" style="margin:-6px 0 4px;min-height:20px"></div>
+    <div id="score-msg" class="score-msg"></div>
+    <button class="replay-btn" onclick="replayGame()">再玩一次</button>
+  </div>
+
+  <div id="script-editor">
+    <div class="editor-header">
+      <div class="editor-title">📝 劇本編輯器</div>
+      <button class="editor-close" onclick="toggleEditor()">✕ 關閉</button>
+    </div>
+    <textarea id="script-textarea" spellcheck="false"></textarea>
+    <div class="editor-hint">
+      <code>mes("對話", "說話者", "圖.jpg", 位置, "框色")</code>　位置：1左 2右 3上 4下　框色可省略，例如 <code>#e94560</code> 或 <code>rgb(80,180,120)</code><br>
+      <code>bg("forest.jpg")</code> → 讀 /img/bg/forest.jpg；<code>bg("night")</code> → 漸層主題<br>
+      <code>addscore(分數名, 值)</code>　<code>readscore(分數名)</code> 可嵌入 mes 文字　<code>end()</code><br>
+      <code>select("選項", 分支, 分數名, 分數值, ...)</code>　分支：<code>label:</code> … <code>end_branch()</code>
+    </div>
+    <div class="editor-actions">
+      <button class="editor-btn editor-btn-primary" onclick="applyScript()">▶ 套用並執行</button>
+      <button class="editor-btn editor-btn-secondary" onclick="loadDemo()">載入範例劇本</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  ENGINE CORE
+// ═══════════════════════════════════════════
+
+const bgCanvas = document.getElementById('bg-canvas');
+const bgCtx = bgCanvas.getContext('2d');
+const titleCanvas = document.getElementById('title-canvas');
+const titleCtx = titleCanvas.getContext('2d');
+
+let TARGET_FPS = 60;
+let TYPE_SPEED = 40;
+let lastTime = 0;
+let frameCount = 0;
+let fpsTimer = 0;
+let animId;
+let titleAnimId;
+
+// ── Particle System ──
+let particles = [];
+let PARTICLE_COUNT = 60;
+
+class Particle {
+  constructor(w, h) {
+    this.w = w; this.h = h;
+    this.reset();
+  }
+  reset() {
+    this.x = Math.random() * this.w;
+    this.y = Math.random() * this.h;
+    this.vx = (Math.random() - 0.5) * 0.3;
+    this.vy = -Math.random() * 0.5 - 0.1;
+    this.r = Math.random() * 2 + 0.5;
+    this.alpha = Math.random() * 0.6 + 0.1;
+    this.life = Math.random() * 200 + 100;
+    this.age = 0;
+    this.color = Math.random() > 0.7 ? '#e94560' : Math.random() > 0.5 ? '#5577ff' : '#ffffff';
+  }
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.age++;
+    if (this.age > this.life || this.y < 0 || this.x < 0 || this.x > this.w) this.reset();
+  }
+  draw(ctx) {
+    ctx.save();
+    ctx.globalAlpha = this.alpha * (1 - this.age / this.life);
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// Background themes
+const bgThemes = {
+  night: { grad: ['#0a0a1e','#0f0f2e','#1a1a3e'], stars: true },
+  dawn:  { grad: ['#1a0a2e','#3a1060','#7a2090'], stars: false },
+  forest:{ grad: ['#051a0a','#0a2a10','#102a15'], stars: false },
+  ruins: { grad: ['#1a1005','#2a2010','#3a3020'], stars: false },
+  ocean: { grad: ['#050a2a','#0a1040','#102060'], stars: true },
+};
+
+let currentBg = 'night';
+
+function resizeCanvases() {
+  const w = window.innerWidth, h = window.innerHeight;
+  bgCanvas.width = w; bgCanvas.height = h;
+  titleCanvas.width = w; titleCanvas.height = h;
+  initParticles(w, h);
+}
+
+function initParticles(w, h) {
+  particles = Array.from({ length: PARTICLE_COUNT }, () => new Particle(w, h));
+}
+
+function drawBackground(ctx, w, h, theme, t) {
+  const cfg = bgThemes[theme] || bgThemes.night;
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, cfg.grad[0]);
+  grad.addColorStop(0.5, cfg.grad[1]);
+  grad.addColorStop(1, cfg.grad[2]);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  if (cfg.stars) {
+    // Twinkling stars (seeded from index)
+    ctx.save();
+    for (let i = 0; i < 80; i++) {
+      const sx = ((i * 137.5) % w);
+      const sy = ((i * 89.7) % (h * 0.6));
+      const twinkle = 0.3 + 0.7 * Math.abs(Math.sin(t * 0.001 + i));
+      ctx.globalAlpha = twinkle * 0.8;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(sx, sy, 0.8 + (i % 3) * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Nebula glow
+  const cx = w * 0.5 + Math.sin(t * 0.0003) * w * 0.1;
+  const cy = h * 0.35 + Math.cos(t * 0.0002) * h * 0.05;
+  const nebula = ctx.createRadialGradient(cx, cy, 0, cx, cy, w * 0.4);
+  nebula.addColorStop(0, 'rgba(100,60,180,0.06)');
+  nebula.addColorStop(0.5, 'rgba(60,40,120,0.03)');
+  nebula.addColorStop(1, 'transparent');
+  ctx.fillStyle = nebula;
+  ctx.fillRect(0, 0, w, h);
+}
+
+// ── Fallback avatar (white stickman on canvas) ──
+function drawFallbackAvatar(canvas) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const cx = w / 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.lineWidth = 6;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  // Head
+  ctx.beginPath();
+  ctx.arc(cx, h * 0.22, 28, 0, Math.PI * 2);
+  ctx.stroke();
+  // Body
+  ctx.beginPath();
+  ctx.moveTo(cx, h * 0.25 + 28);
+  ctx.lineTo(cx, h * 0.58);
+  ctx.stroke();
+  // Arms
+  ctx.beginPath();
+  ctx.moveTo(cx - 50, h * 0.45);
+  ctx.lineTo(cx, h * 0.38);
+  ctx.lineTo(cx + 50, h * 0.45);
+  ctx.stroke();
+  // Legs
+  ctx.beginPath();
+  ctx.moveTo(cx, h * 0.58);
+  ctx.lineTo(cx - 38, h * 0.78);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx, h * 0.58);
+  ctx.lineTo(cx + 38, h * 0.78);
+  ctx.stroke();
+}
+
+function makeFallbackSrc(pos) {
+  const fb = document.createElement('canvas');
+  fb.width = 280; fb.height = 380;
+  drawFallbackAvatar(fb);
+  return fb.toDataURL();
+}
+
+// ── Character Display (JPG from /img/, fallback to stickman) ──
+function showCharacter(filename, pos) {
+  Object.keys(charState).forEach(p => {
+    if (charState[p]) document.getElementById('char-' + p).classList.add('dimmed');
+  });
+  charState[pos] = filename;
+  const el = document.getElementById('char-' + pos);
+  const img = document.getElementById('char-img-' + pos);
+  el.className = 'char-sprite pos-' + pos + ' visible';
+  img.onerror = () => { img.onerror = null; img.src = makeFallbackSrc(pos); };
+  img.src = filename ? '/img/' + filename : '';
+  if (!filename) img.src = makeFallbackSrc(pos);
+}
+let gameScript = [];
+let scriptPointer = 0;
+let typing = false;
+let typeTimer = null;
+let currentText = '';
+let displayedText = '';
+let charIndex = 0;
+let waitingForClick = false;
+let choiceActive = false;
+let gameRunning = false;
+
+const posMap = { 1:'left', 2:'right', 3:'top', 4:'bottom' };
+
+// Visible characters per position
+let charState = { left: null, right: null, top: null, bottom: null };
+
+function showDialog(text, speaker, charName, pos, nameColor) {
+  const box = document.getElementById('dialog-box');
+  const speakerEl = document.getElementById('speaker-name');
+  const textEl = document.getElementById('dialog-text');
+  const cursor = document.getElementById('dialog-cursor');
+  box.style.display = 'block';
+  speakerEl.textContent = speaker || '旁白';
+  // Apply custom name-box color
+  if (nameColor) {
+    speakerEl.style.background = nameColor;
+    document.getElementById('dialog-cursor').style.background = nameColor;
+    document.getElementById('dialog-inner').style.borderColor = nameColor.replace(/[^,]+\)/, '0.35)').replace(/^#/, '') === nameColor ? nameColor + '55' : nameColor.replace(/rgba?\([^)]+\)/, c => c.replace(/[\d.]+\)$/, '0.35)'));
+    // simpler: just set border to same color at low opacity via box-shadow
+    document.getElementById('dialog-inner').style.boxShadow = `0 -4px 40px ${nameColor}22, inset 0 1px 0 rgba(255,255,255,0.05)`;
+    document.getElementById('dialog-inner').style.borderColor = nameColor + '66';
+  } else {
+    speakerEl.style.background = '';
+    document.getElementById('dialog-cursor').style.background = '';
+    document.getElementById('dialog-inner').style.boxShadow = '';
+    document.getElementById('dialog-inner').style.borderColor = '';
+  }
+  currentText = text;
+  displayedText = '';
+  charIndex = 0;
+  typing = true;
+  waitingForClick = false;
+  cursor.classList.remove('show');
+  document.getElementById('dialog-text-content').textContent = '';
+  displayedText = '';
+
+  // Show character
+  if (charName && pos) {
+    const posName = posMap[pos] || 'left';
+    showCharacter(charName, posName);
+  }
+
+  typeNext(textEl, cursor);
+}
+
+function typeNext(el, cursor) {
+  if (charIndex < currentText.length) {
+    displayedText += currentText[charIndex++];
+    document.getElementById('dialog-text-content').textContent = displayedText;
+    typeTimer = setTimeout(() => typeNext(el, cursor), TYPE_SPEED);
+  } else {
+    typing = false;
+    waitingForClick = true;
+    cursor.classList.add('show');
+    if (autoPlayTimer) { clearTimeout(autoPlayTimer); autoPlayTimer = null; }
+  }
+}
+
+function skipType() {
+  if (typing) {
+    clearTimeout(typeTimer);
+    const cursor = document.getElementById('dialog-cursor');
+    displayedText = currentText;
+    document.getElementById('dialog-text-content').textContent = displayedText;
+    typing = false;
+    waitingForClick = true;
+    cursor.classList.add('show');
+  }
+}
+
+function hideAllChars() {
+  ['left','right','top','bottom'].forEach(p => {
+    const el = document.getElementById('char-' + p);
+    const img = document.getElementById('char-img-' + p);
+    el.className = 'char-sprite';
+    img.src = '';
+    charState[p] = null;
+  });
+}
+
+// ── Script Runner ──
+function runNext() {
+  if (!gameRunning || choiceActive) return;
+  if (scriptPointer >= gameScript.length) {
+    showEnd();
+    return;
+  }
+  const cmd = gameScript[scriptPointer++];
+  executeCommand(cmd);
+}
+
+function executeCommand(cmd) {
+  if (!cmd) { runNext(); return; }
+  cmd.call && cmd();
+}
+
+function advance() {
+  if (!gameRunning) return;
+  if (typing) { skipType(); return; }
+  if (waitingForClick && !choiceActive) {
+    waitingForClick = false;
+    runNext();
+  }
+}
+
+bgCanvas.addEventListener('click', advance);
+document.getElementById('dialog-box').addEventListener('click', advance);
+
+// ══════════════════════════════════════════
+//  NAMED SCORE SYSTEM
+//  scores = { healthy: 3, exercise: 2, ... }
+// ══════════════════════════════════════════
+let scores = {};       // named score buckets
+let scoreMaxes = {};   // max per bucket (for end-screen ring)
+let feedbackTimer = null;
+
+function addScore(name, n) {
+  n = Number(n) || 0;
+  scores[name] = (scores[name] || 0) + n;
+  // Update HUD: show total across all buckets
+  const total = Object.values(scores).reduce((a,b)=>a+b,0);
+  document.getElementById('score-live').textContent = total;
+  const hud = document.getElementById('score-hud');
+  hud.classList.add('bump');
+  setTimeout(() => hud.classList.remove('bump'), 300);
+}
+
+function readScore(name) {
+  return scores[name] || 0;
+}
+
+function totalScore() {
+  return Object.values(scores).reduce((a,b)=>a+b,0);
+}
+
+function totalMax() {
+  return Object.values(scoreMaxes).reduce((a,b)=>a+b,0);
+}
+
+function resetScores() {
+  scores = {};
+  scoreMaxes = {};
+  document.getElementById('score-live').textContent = 0;
+}
+
+function showFeedback(correct, msg) {
+  const toast = document.getElementById('feedback-toast');
+  toast.textContent = correct ? ('✓ ' + (msg || '答對了！')) : ('✗ ' + (msg || '再想想看！'));
+  toast.className = 'feedback-toast ' + (correct ? 'correct' : 'wrong') + ' show';
+  if (feedbackTimer) clearTimeout(feedbackTimer);
+  feedbackTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+}
+
+// ── Choices ──
+function showChoices(options, _skipMax) {
+  choiceActive = true;
+  const container = document.getElementById('choice-container');
+  container.innerHTML = '<div class="choice-label">— 請選擇答案 —</div>';
+  options.forEach(({ label, handler, points, scoreName, feedback }) => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = label;
+    btn.onclick = () => {
+      container.classList.remove('visible');
+      choiceActive = false;
+      const pts = Number(points) || 0;
+      if (pts > 0) {
+        addScore(scoreName || '_default', pts);
+        showFeedback(true, feedback || ('答對了！+' + pts + ' 分'));
+      } else if (pts === 0 && typeof points !== 'undefined') {
+        showFeedback(false, feedback || '不太正確，再想想看！');
+      }
+      if (handler && handler.length) {
+        gameScript.splice(scriptPointer, 0, ...handler);
+      }
+      runNext();
+    };
+    container.appendChild(btn);
+  });
+  container.classList.add('visible');
+  document.getElementById('dialog-hint').textContent = '';
+}
+
+// ── Background Control ──
+// bg("night") → canvas gradient fallback
+// bg("forest.jpg") → /img/bg/forest.jpg
+function setBg(val) {
+  const bgImg = document.getElementById('bg-img');
+  if (val && /\.(jpg|jpeg|png|webp|gif)$/i.test(val)) {
+    // JPG mode: show img layer, dim canvas
+    bgImg.onerror = () => {
+      bgImg.onerror = null;
+      bgImg.style.opacity = '0';
+      // fallback to gradient
+      currentBg = 'night';
+    };
+    bgImg.onload = () => { bgImg.style.opacity = '1'; };
+    bgImg.src = '/img/bg/' + val;
+  } else {
+    // Gradient theme mode
+    bgImg.style.opacity = '0';
+    bgImg.src = '';
+    if (bgThemes[val]) currentBg = val;
+  }
+}
+
+// ── Show End ──
+function showEnd() {
+  gameRunning = false;
+  const screen = document.getElementById('end-screen');
+
+  const tot = totalScore();
+  const mx  = totalMax();
+  const pct = mx > 0 ? tot / mx : 0;
+
+  let rank, rankColor, msg;
+  if (pct >= 0.9)      { rank = '🏆 健康達人'; rankColor = '#f5a623'; msg = '恭喜！你的健康知識非常豐富，繼續保持良好的生活習慣！'; }
+  else if (pct >= 0.7) { rank = '🌿 健康好手'; rankColor = '#27ae60'; msg = '做得不錯！再多了解一些健康知識，你會更棒的！'; }
+  else if (pct >= 0.5) { rank = '💪 努力進步'; rankColor = '#2980b9'; msg = '還有進步空間！多關注日常飲食與運動習慣吧。'; }
+  else                 { rank = '📖 繼續學習'; rankColor = '#e94560'; msg = '健康知識需要累積，從今天開始多留意身體的訊號！'; }
+
+  // Build per-bucket breakdown
+  const buckets = Object.keys(scores);
+  let breakdownHtml = '';
+  if (buckets.length > 1) {
+    breakdownHtml = buckets.map(k => {
+      const v = scores[k], m = scoreMaxes[k] || v;
+      return `<span style="margin:0 10px;font-size:13px;color:var(--text-dim)">${k}：<b style="color:#fff">${v}</b>/${m}</span>`;
+    }).join('');
+  }
+  document.getElementById('score-breakdown').innerHTML = breakdownHtml;
+  document.getElementById('score-max-label').textContent = `/ ${mx || tot} 分`;
+  document.getElementById('score-rank').textContent = rank;
+  document.getElementById('score-rank').style.color = rankColor;
+  document.getElementById('score-msg').textContent = msg;
+
+  let displayed = 0;
+  const target = tot;
+  const anim = () => {
+    displayed = Math.min(displayed + Math.ceil((target - displayed) / 8 + 0.5), target);
+    document.getElementById('score-num').textContent = displayed;
+    drawScoreRing(displayed, mx || target || 1, rankColor);
+    if (displayed < target) requestAnimationFrame(anim);
+  };
+  document.getElementById('score-num').textContent = 0;
+  drawScoreRing(0, mx || target || 1, rankColor);
+  screen.classList.add('visible');
+  setTimeout(() => requestAnimationFrame(anim), 300);
+}
+
+function drawScoreRing(val, max, color) {
+  const c = document.getElementById('score-ring');
+  const ctx = c.getContext('2d');
+  const cx = 90, cy = 90, r = 75, lw = 10;
+  ctx.clearRect(0, 0, 180, 180);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = lw;
+  ctx.stroke();
+  const frac = max > 0 ? Math.min(val / max, 1) : 0;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+  ctx.strokeStyle = color || '#f5a623';
+  ctx.lineWidth = lw;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+}
+
+// ── Title ──
+function startGame() {
+  const ts = document.getElementById('title-screen');
+  ts.classList.add('fade-out');
+  cancelAnimationFrame(titleAnimId);
+  setTimeout(() => {
+    ts.style.display = 'none';
+    gameRunning = true;
+    resizeCanvases();
+    scriptPointer = 0;
+    resetScores();
+    runLoop(0);
+    runNext();
+  }, 800);
+}
+
+function replayGame() {
+  document.getElementById('end-screen').classList.remove('visible');
+  document.getElementById('dialog-box').style.display = 'none';
+  hideAllChars();
+  charState = { left: null, right: null, top: null, bottom: null };
+  scriptPointer = 0;
+  resetScores();
+  gameRunning = true;
+  runNext();
+}
+
+// ── Animation Loop ──
+function runLoop(ts) {
+  animId = requestAnimationFrame(runLoop);
+  const dt = ts - lastTime;
+  const interval = 1000 / TARGET_FPS;
+  if (dt < interval) return;
+  lastTime = ts - (dt % interval);
+  frameCount++;
+  fpsTimer += dt;
+  if (fpsTimer > 500) {
+    document.getElementById('fps-display').textContent = `FPS: ${Math.round(frameCount * 1000 / fpsTimer)}`;
+    frameCount = 0; fpsTimer = 0;
+  }
+  const w = bgCanvas.width, h = bgCanvas.height;
+  drawBackground(bgCtx, w, h, currentBg, ts);
+  particles.forEach(p => { p.update(); p.draw(bgCtx); });
+}
+
+// Title animation loop
+function titleLoop(ts) {
+  titleAnimId = requestAnimationFrame(titleLoop);
+  const w = titleCanvas.width, h = titleCanvas.height;
+  drawBackground(titleCtx, w, h, 'night', ts);
+  particles.forEach(p => { p.update(); p.draw(titleCtx); });
+}
+
+// ── Settings ──
+let autoPlayTimer = null;
+function setFPS(v) {
+  TARGET_FPS = parseInt(v);
+  document.getElementById('fps-val').textContent = v;
+  document.getElementById('fps-slider').value = v;
+}
+function setTypeSpeed(v) {
+  TYPE_SPEED = parseInt(v);
+  document.getElementById('speed-val').textContent = v;
+}
+function setParticles(v) {
+  PARTICLE_COUNT = parseInt(v);
+  document.getElementById('particle-val').textContent = v;
+  initParticles(bgCanvas.width, bgCanvas.height);
+}
+function toggleSettings() {
+  document.getElementById('settings-panel').classList.toggle('visible');
+}
+
+// ── Script Editor ──
+function toggleEditor() {
+  const ed = document.getElementById('script-editor');
+  ed.classList.toggle('visible');
+  if (ed.classList.contains('visible')) {
+    document.getElementById('script-textarea').value = document.getElementById('script-textarea').value;
+  }
+}
+
+function applyScript() {
+  const src = document.getElementById('script-textarea').value;
+  try {
+    const compiled = compileScript(src);
+    gameScript = compiled.cmds;
+    // Apply any maxScore declarations from script
+    Object.assign(scoreMaxes, compiled.maxes);
+    document.getElementById('script-editor').classList.remove('visible');
+    document.getElementById('end-screen').classList.remove('visible');
+    document.getElementById('dialog-box').style.display = 'none';
+    hideAllChars();
+    charState = { left: null, right: null, top: null, bottom: null };
+    scriptPointer = 0;
+    resetScores();
+    gameRunning = true;
+    runNext();
+  } catch(e) {
+    alert('劇本語法錯誤：' + e.message);
+  }
+}
+
+function loadDemo() {
+  document.getElementById('script-textarea').value = DEMO_SCRIPT;
+}
+
+// ══════════════════════════════════════════
+//  SCRIPT DSL COMPILER  v2
+//
+//  新語法：
+//  addscore(分數名, 加的分)
+//  readscore(分數名)          → 可嵌入 mes() 的文字插值
+//  select("選項", branchLabel, 分數名, 分數值, ...)
+//
+//  分支語法（內嵌於劇本，不需 branchMap）：
+//  branch_label:
+//    mes("...")
+//    addscore(healthy, 1)
+//  end_branch()
+// ══════════════════════════════════════════
+
+function compileScript(src) {
+  // ── Step 1: parse branch blocks out of source ──
+  // branch_label:  …lines…  end_branch()
+  const branchDefs = {};   // label → raw lines[]
+  const cleanLines = [];
+  const rawLines = src.split('\n').map(l => l.trim());
+
+  let inBranch = null;
+  for (const line of rawLines) {
+    if (!line || line.startsWith('//')) continue;
+
+    // Detect   someLabel:
+    const branchStart = line.match(/^(\w+)\s*:$/);
+    if (branchStart) {
+      inBranch = branchStart[1];
+      branchDefs[inBranch] = [];
+      continue;
+    }
+    if (line === 'end_branch()') {
+      inBranch = null;
+      continue;
+    }
+    if (inBranch !== null) {
+      branchDefs[inBranch].push(line);
+    } else {
+      cleanLines.push(line);
+    }
+  }
+
+  // ── Step 2: compile a line array → cmd array ──
+  function compileLines(lines) {
+    const cmds = [];
+    let i = 0;
+
+    function parseArgs(raw) {
+      const args = [];
+      let cur = '', inQ = false, qc = '';
+      for (const ch of raw) {
+        if ((ch === '"' || ch === "'") && !inQ) { inQ = true; qc = ch; }
+        else if (ch === qc && inQ) { inQ = false; args.push(cur.trim()); cur = ''; }
+        else if (ch === ',' && !inQ) { if (cur.trim()) args.push(cur.trim()); cur = ''; }
+        else { cur += ch; }
+      }
+      if (cur.trim()) args.push(cur.trim());
+      return args;
+    }
+
+    // Interpolate readscore(name) inside a string
+    function interpolate(text) {
+      return text.replace(/readscore\((\w+)\)/g, (_, name) => readScore(name));
+    }
+
+    while (i < lines.length) {
+      const line = lines[i];
+      // strip trailing semicolon
+      const stripped = line.replace(/;$/, '').trim();
+      const m = stripped.match(/^(\w+)\((.*)\)$/s);
+      if (!m) { i++; continue; }
+      const fn = m[1], raw = m[2];
+
+      if (fn === 'mes') {
+        const args = parseArgs(raw);
+        const text0    = args[0] || '';
+        const speaker  = args[1] || '旁白';
+        const charImg  = args[2] || null;
+        const pos      = parseInt(args[3]) || 1;
+        const nameColor = args[4] || null;
+        cmds.push(() => showDialog(interpolate(text0), speaker, charImg, pos, nameColor));
+      }
+
+      else if (fn === 'bg') {
+        const theme = parseArgs(raw)[0] || 'night';
+        cmds.push(() => { setBg(theme); runNext(); });
+      }
+
+      else if (fn === 'hideChars') {
+        cmds.push(() => { hideAllChars(); runNext(); });
+      }
+
+      else if (fn === 'title') {
+        const args = parseArgs(raw);
+        // title() at compile time
+        document.getElementById('game-title').textContent = args[0] || '視覺小說';
+        document.getElementById('game-subtitle').textContent = args[1] || '';
+      }
+
+      // addscore(分數名, 加的分)
+      else if (fn === 'addscore') {
+        const args = parseArgs(raw);
+        const sName = args[0] || '_default';
+        const pts = Number(args[1]) || 0;
+        cmds.push((() => {
+          const _n = sName, _p = pts;
+          return () => { addScore(_n, _p); runNext(); };
+        })());
+      }
+
+      // readscore(分數名)  as a standalone statement → mes it
+      else if (fn === 'readscore') {
+        const args = parseArgs(raw);
+        const sName = args[0] || '_default';
+        cmds.push((() => {
+          const _n = sName;
+          return () => showDialog(`${_n} 分數：${readScore(_n)}`, '系統');
+        })());
+      }
+
+      // select("選項1", branchLabel1, 分數名1, 分數值1, "選項2", ...)
+      // 每組 4 個 token：label, branchLabel, scoreName, scoreValue
+      else if (fn === 'select') {
+        const args = parseArgs(raw);
+        const options = [];
+        let maxPts = 0;
+        for (let j = 0; j < args.length; j += 4) {
+          const pts = Number(args[j+3]) || 0;
+          if (pts > maxPts) maxPts = pts;
+          options.push({
+            label:      args[j]   || '選項',
+            branchTag:  args[j+1] || '',
+            scoreName:  args[j+2] || '_default',
+            points:     pts
+          });
+        }
+        // Capture snapshot
+        const _opts = options, _maxPts = maxPts;
+        cmds.push((() => {
+          const opts = _opts, mp = _maxPts;
+          return () => {
+            // Track max per scoreName (use first option's scoreName as representative)
+            if (mp > 0) {
+              const firstSN = opts.find(o => o.points === mp)?.scoreName || '_default';
+              scoreMaxes[firstSN] = (scoreMaxes[firstSN] || 0) + mp;
+            }
+            const resolved = opts.map(o => ({
+              label:     o.label,
+              handler:   branchDefs[o.branchTag] ? compileLines(branchDefs[o.branchTag]) : [],
+              points:    o.points,
+              scoreName: o.scoreName
+            }));
+            showChoices(resolved, true);
+          };
+        })());
+      }
+
+      else if (fn === 'end') {
+        cmds.push(() => showEnd());
+      }
+
+      i++;
+    }
+    return cmds;
+  }
+
+  const cmds = compileLines(cleanLines);
+  return { cmds, maxes: scoreMaxes };
+}
+
+function serializeScript() {
+  return document.getElementById('script-textarea').value;
+}
+
+// ══════════════════════════════════════════
+//  DEMO SCRIPT  (健康問答 + 具名分數 + 內嵌分支)
+// ══════════════════════════════════════════
+const DEMO_SCRIPT = `// ★ 健康知識問答遊戲 ★
+// mes("對話", "說話者", "圖.jpg", 位置, "框色")
+// bg("ocean.jpg")  → /img/bg/ocean.jpg
+// bg("night")      → 內建漸層主題
+
+title("健康知識問答挑戰", "HEALTH QUIZ")
+bg("ocean.jpg")
+mes("嗨！我是健康小衛寶熊，今天要考考你！", "衛寶熊", "doctor.jpg", 2, "#27ae60")
+mes("共 3 題，分別測驗「飲食」和「運動」兩大面向。", "衛寶熊", "doctor.jpg", 2, "#27ae60")
+
+bg("night.jpg")
+mes("第一題：成年人每天建議喝多少水？", "衛寶熊", "doctor.jpg", 2, "#2980b9")
+select("約 500 毫升", q1_wrong, diet, 0, "約 2000 毫升", q1_right, diet, 20, "約 5000 毫升", q1_wrong2, diet, 0)
+
+mes("第二題：下列哪種食物對心血管最有益？", "衛寶熊", "doctor.jpg", 2, "#2980b9")
+select("炸雞", q2_wrong, diet, 0, "深海魚（鮭魚）", q2_right, diet, 20, "奶油蛋糕", q2_wrong2, diet, 0)
+
+bg("forest.jpg")
+mes("第三題：成人每週建議有氧運動幾分鐘？", "衛寶熊", "doctor.jpg", 2, "#8e44ad")
+select("30 分鐘以下", q3_wrong, exercise, 0, "150 分鐘以上", q3_right, exercise, 20, "10 分鐘就夠了", q3_wrong2, exercise, 0)
+
+bg("dawn.jpg")
+mes("測驗結束！你的飲食得分：readscore(diet) 分，運動得分：readscore(exercise) 分。", "衛寶熊", "doctor.jpg", 2, "#e67e22")
+end()
+
+q1_right:
+  mes("正確！每天喝足 2000ml 的水有助於代謝。", "衛寶熊", "doctor.jpg", 2, "#27ae60")
+end_branch()
+q1_wrong:
+  mes("500ml 太少了！成人建議每天至少喝 2000ml。", "衛寶熊", "doctor.jpg", 2, "#e74c3c")
+end_branch()
+q1_wrong2:
+  mes("5000ml 過多！正常建議是 2000ml 左右。", "衛寶熊", "doctor.jpg", 2, "#e74c3c")
+end_branch()
+
+q2_right:
+  mes("答對！深海魚富含 Omega-3，有益心血管健康。", "衛寶熊", "doctor.jpg", 2, "#27ae60")
+end_branch()
+q2_wrong:
+  mes("炸雞熱量高、油脂多，對心血管負擔較大喔！", "衛寶熊", "doctor.jpg", 2, "#e74c3c")
+end_branch()
+q2_wrong2:
+  mes("奶油蛋糕含有大量飽和脂肪，要適量！", "衛寶熊", "doctor.jpg", 2, "#e74c3c")
+end_branch()
+
+q3_right:
+  mes("完全正確！WHO 建議每週至少 150 分鐘中等強度運動。", "衛寶熊", "doctor.jpg", 2, "#27ae60")
+end_branch()
+q3_wrong:
+  mes("不夠喔！30 分鐘遠低於建議標準，試著多動動吧！", "衛寶熊", "doctor.jpg", 2, "#e74c3c")
+end_branch()
+q3_wrong2:
+  mes("10 分鐘太少囉！規律運動才能維持健康。", "衛寶熊", "doctor.jpg", 2, "#e74c3c")
+end_branch()
+`;
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+window.addEventListener('resize', resizeCanvases);
+resizeCanvases();
+titleLoop(0);
+
+const _compiled = compileScript(DEMO_SCRIPT);
+gameScript = _compiled.cmds;
+Object.assign(scoreMaxes, _compiled.maxes);
+
+document.getElementById('script-textarea').value = DEMO_SCRIPT;
+
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'Enter') {
+    if (!document.getElementById('script-editor').classList.contains('visible')) advance();
+  }
+  if (e.code === 'Escape') {
+    document.getElementById('settings-panel').classList.remove('visible');
+    document.getElementById('script-editor').classList.remove('visible');
+  }
+});
+</script>
+</body>
+</html>
