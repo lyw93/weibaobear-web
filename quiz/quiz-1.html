@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>健康學習站 - 衛寶熊特務訓練營</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@300;400;500&display=swap');
+
+  :root {
+    --primary: #1a1a2e;
+    --secondary: #16213e;
+    --accent: #e94560;
+    --accent2: #0f3460;
+    --gold: #f5a623;
+    --text-light: #e8e8f0;
+    --text-dim: #9090aa;
+    --dialog-bg: rgba(10,10,25,0.92);
+    --dialog-border: rgba(233,69,96,0.4);
+    --choice-bg: rgba(15,52,96,0.85);
+    --choice-hover: rgba(233,69,96,0.25);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans TC', sans-serif;
+    background: #000;
+    color: var(--text-light);
+    overflow: hidden;
+    height: 100vh;
+    user-select: none;
+  }
+
+  #game-container {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #bg-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+  }
+
+  #bg-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+  }
+
+  /* ── 黑色科技對話框 ── */
+  #dialog-box {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    padding: 0 40px 30px;
+    transition: opacity 0.3s;
+  }
+
+  #dialog-inner {
+    background: var(--dialog-bg);
+    border: 1px solid var(--dialog-border);
+    border-radius: 12px;
+    padding: 20px 28px 16px;
+    backdrop-filter: blur(16px);
+    position: relative;
+    box-shadow: 0 -4px 40px rgba(233,69,96,0.12), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  #speaker-name {
+    position: absolute;
+    top: -16px;
+    left: 24px;
+    background: linear-gradient(90deg, var(--accent), #c0392b);
+    color: #fff;
+    font-family: 'Noto Serif TC', serif;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 4px 20px;
+    border-radius: 8px 8px 0 0;
+    letter-spacing: 2px;
+    min-width: 80px;
+    text-align: center;
+  }
+
+  #dialog-text {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 17px;
+    line-height: 1.8;
+    color: var(--text-light);
+    min-height: 60px;
+  }
+
+  #dialog-cursor {
+    display: inline-block;
+    width: 10px;
+    height: 18px;
+    background: var(--accent);
+    margin-left: 4px;
+    vertical-align: middle;
+    animation: blink 0.8s infinite;
+    opacity: 0;
+  }
+  #dialog-cursor.show { opacity: 1; }
+
+  /* ── 抉擇按鈕選單 ── */
+  #choice-container {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 20px;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  #choice-container.visible { opacity: 1; pointer-events: all; }
+  .choice-label { font-size: 12px; color: var(--text-dim); letter-spacing: 3px; margin-bottom: 8px; }
+  .choice-btn { background: var(--choice-bg); border: 1px solid rgba(233,69,96,0.35); border-radius: 8px; color: var(--text-light); font-family: 'Noto Serif TC', serif; font-size: 16px; padding: 14px 48px; cursor: pointer; width: min(500px, 90%); text-align: center; transition: all 0.2s; }
+  .choice-btn:hover { border-color: var(--accent); background: rgba(233,69,96,0.2); transform: translateY(-2px); }
+
+  /* ── HUD 頂部面板 (復活的控制區) ── */
+  #hud { position: absolute; top: 16px; right: 16px; z-index: 30; display: flex; gap: 8px; align-items: center; }
+  .hud-btn { background: rgba(10,10,25,0.7); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-light); font-size: 12px; padding: 6px 14px; cursor: pointer; transition: all 0.2s; backdrop-filter: blur(8px); letter-spacing: 1px; }
+  .hud-btn:hover { color: #fff; border-color: var(--accent); }
+  #fps-display { background: rgba(10,10,25,0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: var(--text-dim); font-size: 11px; font-family: monospace; padding: 6px 12px; backdrop-filter: blur(8px); }
+
+  #score-hud { position: absolute; top: 16px; left: 16px; z-index: 30; background: rgba(10,10,25,0.75); border: 1px solid rgba(245,166,35,0.3); border-radius: 8px; padding: 6px 16px; font-size: 13px; color: var(--gold); font-family: 'Noto Serif TC', serif; display: none; }
+  #feedback-toast { position: absolute; top: 55px; left: 16px; z-index: 31; font-size: 13px; padding: 5px 14px; border-radius: 6px; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
+
+  /* ── ⚙️ 復活的經典高級設定面板 UI ── */
+  #settings-panel {
+    position: absolute;
+    top: 60px;
+    right: 16px;
+    z-index: 40;
+    background: rgba(10,10,25,0.95);
+    border: 1px solid rgba(233,69,96,0.3);
+    border-radius: 12px;
+    padding: 20px;
+    width: 240px;
+    backdrop-filter: blur(20px);
+    display: none;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  }
+  #settings-panel.visible { display: block; }
+  .setting-row { margin-bottom: 16px; }
+  .setting-label { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .setting-label span { color: var(--gold); font-family: monospace; }
+  input[type=range] { width: 100%; height: 4px; -webkit-appearance: none; background: rgba(255,255,255,0.15); border-radius: 2px; cursor: pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+
+  /* ── 📝 劇本編輯器 ── */
+  #script-editor { position: absolute; inset: 0; z-index: 60; background: rgba(5,5,15,0.98); backdrop-filter: blur(20px); display: none; flex-direction: column; padding: 20px; }
+  #script-editor.visible { display: flex; }
+  .editor-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .editor-title { font-size: 14px; color: var(--gold); font-family: monospace; }
+  .editor-close { background: none; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: var(--text-dim); cursor: pointer; padding: 4px 12px; }
+  #script-textarea { flex: 1; background: rgba(10,10,30,0.9); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #a8d8a8; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.7; padding: 16px; resize: none; outline: none; }
+  .editor-actions { display: flex; gap: 10px; margin-top: 12px; }
+  .editor-btn { padding: 8px 20px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+  .editor-btn-primary { background: var(--accent); border: none; color: #fff; }
+  .editor-btn-secondary { background: none; border: 1px solid rgba(255,255,255,0.2); color: var(--text-dim); }
+
+  /* ── 🌟 完美融合圖一原創視覺的首頁樣式 ── */
+  #title-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    background-image: url('00000000.jpg'); 
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: opacity 0.8s ease-in-out;
+  }
+  #title-screen.fade-out { opacity: 0; pointer-events: none; }
+
+  /* ── 🎯 隱形且完美覆蓋於「進入實驗室」棕色木盒上方的熱區按鈕 ── */
+  .start-btn {
+    position: absolute;
+    bottom: 13%; 
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(350px, 45vw);
+    height: min(78px, 11vh);
+    background: transparent; 
+    border: 3px solid transparent;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s;
+    outline: none;
+  }
+  .start-btn:hover {
+    border-color: rgba(233, 69, 96, 0.6);
+    box-shadow: 0 0 25px rgba(233, 69, 96, 0.5);
+    background: rgba(233, 69, 96, 0.08);
+  }
+
+  /* ── 結算畫面 ── */
+  #end-screen { position: absolute; inset: 0; z-index: 45; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.95); text-align: center; gap: 18px; }
+  #end-screen.visible { display: flex; }
+  #score-num { font-family: 'Noto Serif TC', serif; font-size: 52px; font-weight: 700; color: #fff; }
+  .score-ring-wrap { position: relative; width: 180px; height: 180px; }
+  .score-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .score-max-label { font-size: 14px; color: var(--text-dim); }
+  .score-rank { font-family: 'Noto Serif TC', serif; font-size: 22px; font-weight: 700; color: var(--gold); }
+  .replay-btn { background: var(--accent); border: none; border-radius: 8px; color: #fff; font-size: 16px; padding: 12px 40px; cursor: pointer; margin-top: 8px; }
+
+  /* =========================================
+     🌟 以下為首頁專屬外掛 CSS (不影響原結構) 
+     ========================================= */
+  #title-hud-trigger {
+    position: absolute;
+    top: 3%;
+    right: 2%;
+    width: 25vw;
+    max-width: 160px;
+    height: 12vh;
+    max-height: 80px;
+    background: transparent;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    z-index: 100;
+  }
+  #title-hud-trigger:hover {
+    border-color: rgba(245, 166, 35, 0.4);
+    box-shadow: 0 0 15px rgba(245, 166, 35, 0.3);
+  }
+
+  #title-menu-panel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 110;
+    background: rgba(10, 10, 25, 0.95);
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    padding: 24px;
+    width: min(340px, 90vw);
+    backdrop-filter: blur(20px);
+    display: none;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.8);
+    color: var(--text-light);
+  }
+  #title-menu-panel.visible { display: block; }
+  .menu-section { margin-bottom: 16px; }
+  .menu-title { font-size: 14px; color: var(--gold); font-weight: bold; margin-bottom: 10px; border-left: 3px solid var(--gold); padding-left: 8px; letter-spacing: 1px;}
+  .menu-text { font-size: 12px; line-height: 1.8; color: var(--text-dim); background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; }
+  .menu-text span { color: #a8d8a8; font-weight: bold; }
+  .menu-toggle-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-light); margin-bottom: 10px; padding: 0 4px;}
+  .toggle-btn { background: rgba(233,69,96,0.2); border: 1px solid var(--accent); color: #fff; padding: 4px 16px; border-radius: 4px; cursor: pointer; font-size: 12px; transition: 0.2s;}
+  .toggle-btn:hover { background: var(--accent); }
+  .close-menu-btn { width: 100%; background: var(--choice-bg); border: 1px solid rgba(255,255,255,0.2); padding: 10px; border-radius: 8px; color: #fff; cursor: pointer; margin-top: 10px; font-family: 'Noto Serif TC', serif; letter-spacing: 2px; transition: 0.2s;}
+  .close-menu-btn:hover { border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div id="game-container">
+  <canvas id="bg-canvas"></canvas>
+  <img id="bg-img" src="" alt="" draggable="false" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;opacity:0;transition:opacity 0.6s;">
+
+  <div id="dialog-box" style="display:none">
+    <div id="dialog-inner">
+      <div id="speaker-name">旁白</div>
+      <div id="dialog-text"><span id="dialog-text-content"></span><span id="dialog-cursor" class="show"></span></div>
+      <div id="dialog-hint">點擊繼續 ▶</div>
+    </div>
+  </div>
+
+  <div id="choice-container"><div class="choice-label">— 請選擇答案 —</div></div>
+
+  <div id="hud">
+    <div id="fps-display">FPS: 60</div>
+    <button class="hud-btn" onclick="toggleSettings()">⚙ 設定</button>
+    <button class="hud-btn" onclick="toggleEditor()">📝 劇本</button>
+    <a href="../food/food-1.html" class="hud-btn" style="text-decoration:none;">離開特訓 🚪</a>
+  </div>
+
+  <div id="score-hud">🏆 特務積分：<span id="score-live">0</span></div>
+  <div id="feedback-toast" style="position: absolute; top: 55px; left: 16px; z-index: 31; font-size: 13px; padding: 5px 14px; border-radius: 6px; pointer-events: none; opacity: 0; transition: opacity 0.3s;"></div>
+
+  <div id="settings-panel">
+    <div class="setting-row">
+      <div class="setting-label">動畫 FPS <span id="fps-val">60</span></div>
+      <input type="range" min="10" max="120" value="60" id="fps-slider" oninput="setFPS(this.value)">
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">打字速度 <span id="speed-val">30</span> ms</div>
+      <input type="range" min="10" max="120" value="30" id="speed-slider" oninput="setTypeSpeed(this.value)">
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">背景粒子密度 <span id="particle-val">25</span></div>
+      <input type="range" min="5" max="100" value="25" id="particle-slider" oninput="setParticles(this.value)">
+    </div>
+  </div>
+
+  <!-- =========================================
+       🌟 首頁專屬：遊戲化系統選單 (完全不影響原結構) 
+       ========================================= -->
+  <div id="title-menu-panel">
+    <div class="menu-section">
+      <div class="menu-title">📜 任務檔案 (Mission Brief)</div>
+      <div class="menu-text">
+        任務目標：<span>提升校園健康識能</span><br>
+        核心設計：情境式學習與防護戰衣<br>
+        作戰區域：淡江大學校園<br>
+        開發單位：衛寶熊專案組<br>
+        系統狀態：<span>連線正常 v1.0.0</span>
+      </div>
+    </div>
+    <div class="menu-section">
+      <div class="menu-title">⚙️ 系統設定 (Settings)</div>
+      <div class="menu-toggle-row">背景音樂 (BGM) <button class="toggle-btn" onclick="this.textContent = this.textContent === 'ON' ? 'OFF' : 'ON'">ON</button></div>
+      <div class="menu-toggle-row">系統音效 (SFX) <button class="toggle-btn" onclick="this.textContent = this.textContent === 'ON' ? 'OFF' : 'ON'">ON</button></div>
+      <div class="menu-toggle-row">畫面品質 (Graphics) <button class="toggle-btn">High</button></div>
+    </div>
+    <div class="menu-section">
+      <div class="menu-title">🎮 操作說明</div>
+      <div style="font-size:12px; color:var(--text-dim); line-height:1.6;">
+        點擊畫面可推進對話進度。<br>在遭遇疲勞病毒時，請依據情境做出正確的健康決策以維持戰衣能量！
+      </div>
+    </div>
+    <button class="close-menu-btn" onclick="toggleTitleMenu()">確認 / 返回</button>
+  </div>
+
+  <div id="title-screen">
+    <button class="start-btn" onclick="startGame()"></button>
+    <!-- 🎯 疊加在木頭圖示的觸發按鈕 -->
+    <button id="title-hud-trigger" onclick="toggleTitleMenu()"></button>
+  </div>
+
+  <div id="end-screen">
+    <div class="end-title" id="end-title-text">— 特務特訓大結算 —</div>
+    <div class="score-ring-wrap">
+      <canvas id="score-ring" width="180" height="180"></canvas>
+      <div class="score-center">
+        <div id="score-num">0</div>
+        <div class="score-max-label" id="score-max-label">/ 100 分</div>
+      </div>
+    </div>
+    <div id="score-rank" class="score-rank">🏆 終極神盾特務</div>
+    <div id="score-breakdown" style="margin:-6px 0 4px;min-height:20px; color:#9090aa; font-size:13px;"></div>
+    <button class="replay-btn" onclick="replayGame()">重新特訓 🔄</button>
+  </div>
+
+  <div id="script-editor">
+    <div class="editor-header">
+      <div class="editor-title">📝 劇本編輯器 (隨時修改你的分鏡台詞)</div>
+      <button class="editor-close" onclick="toggleEditor()">✕ 關閉</button>
+    </div>
+    <textarea id="script-textarea" spellcheck="false"></textarea>
+    <div class="editor-actions">
+      <button class="editor-btn editor-btn-primary" onclick="applyScript()">▶ 套用並執行</button>
+      <button class="editor-btn editor-btn-secondary" onclick="loadDemo()">重置回分鏡原創劇本</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  ENGINE CORE - 背景特效、對話系統、分數機制等核心功能實現
+// ═══════════════════════════════════════════
+const bgCanvas = document.getElementById('bg-canvas'); const bgCtx = bgCanvas.getContext('2d');
+
+let TARGET_FPS = 60; let TYPE_SPEED = 30; let lastTime = 0; let frameCount = 0; let fpsTimer = 0; let animId;
+let particles = []; let PARTICLE_COUNT = 25;
+
+class Particle {
+  constructor(w, h) { this.w = w; this.h = h; this.reset(); }
+  reset() {
+    this.x = Math.random() * this.w; this.y = Math.random() * this.h;
+    this.vx = (Math.random() - 0.5) * 0.2; this.vy = -Math.random() * 0.4 - 0.1;
+    this.r = Math.random() * 1.8 + 0.5; this.alpha = Math.random() * 0.4 + 0.1;
+    this.life = Math.random() * 200 + 100; this.age = 0;
+    this.color = Math.random() > 0.7 ? '#e94560' : '#ffffff';
+  }
+  update() { this.x += this.vx; this.y += this.vy; this.age++; if (this.age > this.life || this.y < 0) this.reset(); }
+  draw(ctx) {
+    ctx.save(); ctx.globalAlpha = this.alpha * (1 - this.age / this.life); ctx.fillStyle = this.color;
+    ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  }
+}
+
+function resizeCanvases() {
+  const w = window.innerWidth, h = window.innerHeight; bgCanvas.width = w; bgCanvas.height = h;
+  initParticles(w, h);
+}
+function initParticles(w, h) {
+  particles = Array.from({ length: PARTICLE_COUNT }, () => new Particle(w, h));
+}
+function drawBackground(ctx, w, h, theme, t) {
+  const grad = ctx.createLinearGradient(0, 0, 0, h); grad.addColorStop(0, '#0a0a1e'); grad.addColorStop(1, '#1a1a3e');
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
+}
+
+let gameScript = []; let scriptPointer = 0; let typing = false; let typeTimer = null; let currentText = ''; let displayedText = ''; let charIndex = 0; let waitingForClick = false; let choiceActive = false; let gameRunning = false;
+let scores = {};
+
+function parseDynamicText(text) {
+  const h = localStorage.getItem('saved_height'); const w = localStorage.getItem('saved_weight'); const waist = localStorage.getItem('saved_waist');
+  if (!h || !w || !waist) {
+    return text.replace(/{stats_placeholder}/g, "正在連線基本指標... 💡 系統偵測到妳尚未由檔案中心建立特務指標，建議先前往填寫喔！");
+  }
+  return text.replace(/{stats_placeholder}/g, `妳的最新校園防衛指標為：身高 ${h} cm、體重 ${w} kg、腰圍 ${waist} cm，認證密碼完全吻合！`);
+}
+
+function showDialog(text, speaker) {
+  const box = document.getElementById('dialog-box'); const speakerEl = document.getElementById('speaker-name');
+  box.style.display = 'block'; speakerEl.textContent = speaker || '旁白';
+  currentText = parseDynamicText(text); displayedText = ''; charIndex = 0; typing = true; waitingForClick = false;
+  document.getElementById('dialog-cursor').classList.remove('show');
+  document.getElementById('dialog-text-content').textContent = '';
+  typeNext();
+}
+
+function typeNext() {
+  if (charIndex < currentText.length) {
+    displayedText += currentText[charIndex++]; document.getElementById('dialog-text-content').textContent = displayedText;
+    typeTimer = setTimeout(typeNext, TYPE_SPEED);
+  } else {
+    typing = false; waitingForClick = true; document.getElementById('dialog-cursor').classList.add('show');
+  }
+}
+
+function skipType() {
+  if (typing) {
+    clearTimeout(typeTimer); displayedText = currentText; document.getElementById('dialog-text-content').textContent = displayedText;
+    typing = false; waitingForClick = true; document.getElementById('dialog-cursor').classList.add('show');
+  }
+}
+
+function runNext() {
+  if (!gameRunning || choiceActive) return;
+  if (scriptPointer >= gameScript.length) { showEnd(); return; }
+  const cmd = gameScript[scriptPointer++]; if (cmd) cmd();
+}
+
+function advance() {
+  if (!gameRunning) return; if (typing) { skipType(); return; }
+  if (waitingForClick && !choiceActive) { waitingForClick = false; runNext(); }
+}
+bgCanvas.addEventListener('click', advance); document.getElementById('dialog-box').addEventListener('click', advance);
+
+function addScore(name, n) {
+  n = Number(n) || 0; scores[name] = (scores[name] || 0) + n;
+  document.getElementById('score-live').textContent = Object.values(scores).reduce((a,b)=>a+b,0);
+}
+
+function showFeedback(correct, msg) {
+  const toast = document.getElementById('feedback-toast');
+  toast.textContent = correct ? ('✓ ' + (msg || '防線完好，完美通過！')) : ('✗ ' + (msg || '遭受病毒突襲！'));
+  toast.className = correct ? 'correct show' : 'wrong show'; setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+function showChoices(options) {
+  choiceActive = true; const container = document.getElementById('choice-container');
+  container.innerHTML = '<div class="choice-label">— 請選擇特務答案 —</div>';
+  options.forEach(o => {
+    const btn = document.createElement('button'); btn.className = 'choice-btn'; btn.textContent = o.label;
+    btn.onclick = () => {
+      container.classList.remove('visible'); choiceActive = false; const pts = Number(o.points) || 0;
+      if (pts > 0) { addScore(o.scoreName, pts); showFeedback(true, o.label + " 正確！+" + pts + "分"); }
+      else { showFeedback(false, "糟糕！選錯路了，遭受疲勞病毒干擾！"); }
+      if (o.handler && o.handler.length) { gameScript.splice(scriptPointer, 0, ...o.handler); }
+      runNext();
+    };
+    container.appendChild(btn);
+  });
+  container.classList.add('visible');
+}
+
+function setBg(val) { const img = document.getElementById('bg-img'); if (val) { img.style.opacity = '1'; img.src = val; } else { img.style.opacity = '0'; } }
+
+function showEnd() {
+  gameRunning = false; document.getElementById('end-screen').classList.add('visible');
+  document.getElementById('hud').style.display = 'none'; document.getElementById('score-hud').style.display = 'none';
+  const tot = Object.values(scores).reduce((a,b)=>a+b,0); document.getElementById('score-num').textContent = tot;
+  document.getElementById('score-breakdown').innerHTML = `關卡特訓總得分：${tot} / 100 分<br>（數據已同步上傳至淡江大學衛保組雲端後台 🟢）`;
+  sendGameToLMS(tot);
+}
+
+// 🌟 新增：首頁專屬選單開關
+function toggleTitleMenu() {
+  document.getElementById('title-menu-panel').classList.toggle('visible');
+}
+
+function startGame() {
+  document.getElementById('title-screen').classList.add('fade-out');
+  document.getElementById('title-hud-trigger').style.display = 'none'; // 隱藏首頁專屬熱區
+  document.getElementById('title-menu-panel').classList.remove('visible'); // 確保面板關閉
+  setTimeout(() => {
+    document.getElementById('title-screen').style.display = 'none'; gameRunning = true;
+    document.getElementById('hud').style.display = 'flex'; document.getElementById('score-hud').style.display = 'block';
+    resizeCanvases(); scriptPointer = 0; scores = {}; document.getElementById('score-live').textContent = 0; runLoop(0); runNext();
+  }, 500);
+}
+
+function replayGame() {
+  document.getElementById('end-screen').classList.remove('visible'); document.getElementById('dialog-box').style.display = 'none';
+  document.getElementById('title-screen').classList.remove('fade-out'); document.getElementById('title-screen').style.display = 'flex';
+  document.getElementById('title-hud-trigger').style.display = 'block'; // 恢復首頁熱區
+  scriptPointer = 0; scores = {}; document.getElementById('score-live').textContent = 0; gameRunning = false;
+}
+
+function runLoop(ts) {
+  animId = requestAnimationFrame(runLoop); const dt = ts - lastTime; if (dt < 1000 / TARGET_FPS) return; lastTime = ts - (dt % (1000 / TARGET_FPS));
+  frameCount++; fpsTimer += dt; if (fpsTimer > 500) { document.getElementById('fps-display').textContent = `FPS: ${Math.round(frameCount * 1000 / fpsTimer)}`; frameCount = 0; fpsTimer = 0; }
+  bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height); drawBackground(bgCtx, bgCanvas.width, bgCanvas.height, 'night', ts); particles.forEach(p => { p.update(); p.draw(bgCtx); });
+}
+
+// ── ⚙️ 復活的實體面板開關、數值同步函數 ──
+function toggleSettings() { document.getElementById('settings-panel').classList.toggle('visible'); }
+function toggleEditor() { document.getElementById('script-editor').classList.toggle('visible'); }
+function setFPS(v) { TARGET_FPS = parseInt(v); document.getElementById('fps-val').textContent = v; }
+function setTypeSpeed(v) { TYPE_SPEED = parseInt(v); document.getElementById('speed-val').textContent = v; }
+function setParticles(v) { PARTICLE_COUNT = parseInt(v); document.getElementById('particle-val').textContent = v; initParticles(bgCanvas.width, bgCanvas.height); }
+
+function applyScript() {
+  const src = document.getElementById('script-textarea').value; const compiled = compileScript(src); gameScript = compiled.cmds;
+  document.getElementById('script-editor').classList.remove('visible'); document.getElementById('end-screen').classList.remove('visible');
+  document.getElementById('dialog-box').style.display = 'none'; scriptPointer = 0; scores = {}; document.getElementById('score-live').textContent = 0; gameRunning = true; runNext();
+}
+function loadDemo() { document.getElementById('script-textarea').value = DEMO_SCRIPT; }
+
+function compileScript(src) {
+  const branchDefs = {}; const cleanLines = []; const rawLines = src.split('\n').map(l => l.trim()); let inBranch = null;
+  for (const line of rawLines) {
+    if (!line || line.startsWith('//')) continue; const branchStart = line.match(/^(\w+)\s*:$/);
+    if (branchStart) { inBranch = branchStart[1]; branchDefs[inBranch] = []; continue; }
+    if (line === 'end_branch()') { inBranch = null; continue; }
+    if (inBranch !== null) { branchDefs[inBranch].push(line); } else { cleanLines.push(line); }
+  }
+  function compileLines(lines) {
+    const cmds = []; let i = 0;
+    function parseArgs(raw) {
+      const args = []; let cur = '', inQ = false, qc = '';
+      for (const ch of raw) {
+        if ((ch === '"' || ch === "'") && !inQ) { inQ = true; qc = ch; }
+        else if (ch === qc && inQ) { inQ = false; args.push(cur.trim()); cur = ''; }
+        else if (ch === ',' && !inQ) { if (cur.trim()) args.push(cur.trim()); cur = ''; }
+        else { cur += ch; }
+      }
+      if (cur.trim()) args.push(cur.trim()); return args;
+    }
+    while (i < lines.length) {
+      const line = lines[i]; const stripped = line.replace(/;$/, '').trim(); const m = stripped.match(/^(\w+)\((.*)\)$/s);
+      if (!m) { i++; continue; } const fn = m[1], raw = m[2];
+      if (fn === 'mes') { const args = parseArgs(raw); cmds.push(() => showDialog(args[0]||'', args[1]||'旁白')); }
+      else if (fn === 'bg') { cmds.push(() => { setBg(parseArgs(raw)[0]); runNext(); }); }
+      else if (fn === 'addscore') { const args = parseArgs(raw); cmds.push((() => { const n = args[0], p = Number(args[1]); return () => { addScore(n, p); runNext(); }; })()); }
+      else if (fn === 'select') {
+        const args = parseArgs(raw); const options = [];
+        for (let j = 0; j < args.length; j += 4) { options.push({ label: args[j], branchTag: args[j+1], scoreName: args[j+2], points: Number(args[j+3]) }); }
+        cmds.push((() => { const opts = options; return () => { const resolved = opts.map(o => ({ label: o.label, points: o.points, scoreName: o.scoreName, handler: branchDefs[o.branchTag] ? compileLines(branchDefs[o.branchTag]) : [] })); showChoices(resolved); }; })());
+      }
+      else if (fn === 'end') { cmds.push(() => showEnd()); } i++;
+    }
+    return cmds;
+  }
+  return { cmds: compileLines(cleanLines) };
+}
+
+function sendGameToLMS(score) {
+  const id = localStorage.getItem('saved_student_id') || '校園測試員'; const role = localStorage.getItem('saved_role') || '大學部學生'; const name = localStorage.getItem('saved_name') || '匿名特務';
+  const targetUrl = "https://docs.google.com/forms/d/e/1FAIpQLSeCsJUaZRtzP1ZhRQ83_97oOB2e9VxHb4txav9I5sPvKYqUyg/formResponse"; const formData = new FormData();
+  formData.append('entry.1612908578', id); formData.append('entry.22380892', role); formData.append('entry.639290903', name); formData.append('entry.573874726', "星期二"); formData.append('entry.2005915541', "學習站最終結算"); formData.append('entry.303471113', "安全防護公測版"); formData.append('entry.1059819279', `特訓總得分:${score}分`);
+  fetch(targetUrl, { method: 'POST', mode: 'no-cors', body: formData });
+}
+</script>
+
+<script>
+// ══════════════════════════════════════════
+//  🌟 劇本大腦：與妳新畫的 10 張圖片、專案流程 100% 同步的官方 DSL 腳本
+// ══════════════════════════════════════════
+const DEMO_SCRIPT = `// ★ 衛寶熊特務訓練營官方互動劇本 ★
+// 語法支援：mes("文字", "說話者") | bg("圖片檔名.jpg") | select("選項", 分支標籤, 分數項目, 分數)
+
+bg("S__7766019.jpg")
+mes("衛寶熊：『歡迎加入特務行動！訂做專專屬於你的戰衣！』", "衛寶熊")
+
+bg("S__7774210.jpg")
+mes("衛寶熊：『{stats_placeholder}』", "衛寶熊")
+
+bg("S__7790595_0.jpg")
+mes("衛寶熊：『正在分析戰衣狀態... 查看分析：正常。』", "衛寶熊")
+mes("衛寶熊：『你的戰衣狀態正常！健康建議：BMI正常、腰圍正常。你的戰衣等級：全能勇者！繼續保持！』", "衛寶熊")
+
+bg("S__7790597_0.jpg")
+mes("衛寶熊：『太好了，這樣一來我們就了解了我們戰衣的防護機制了。我們趕快穿上實測看看吧。這條「克難坡」就是最佳的實測場地。』", "衛寶熊")
+mes("（突然一陣轟動！）衛寶熊：『等等！警報響了！校園防禦牆破了裂縫，疲勞病毒正準備入侵，我們得趕快趕過去！』", "衛寶熊")
+
+bg("S__7790599_0.jpg")
+mes("衛寶熊：『前面是克難坡的岔路！這裡有病毒留下的干擾，我們必須運用剛學到的運動與健康知識選擇正確道路！』", "衛寶熊")
+select("A. 負重訓練（肌肉）", kr_wrong, health, 0, "B. 核心穩定運動", kr_right, health, 25)
+
+bg("S__7790601_0.jpg")
+mes("衛寶熊拿出一份「戰衣長期檢測報告」。衛寶熊：『雖然你成功通過克難坡，但如果長期體位異常，身體內部還是會慢慢受損，過重會導致關節壓力增加喔！』", "衛寶熊")
+mes("衛寶熊：『過輕會導致能量不足、容易疲勞；過重與肥胖則會讓關節壓力增加、內臟負擔提升喔！』", "衛寶熊")
+mes("衛寶熊：『決戰就快開始了！不過在進入最後的防禦戰前，必須先啟動身體的防禦系統。快跟著我一起做暖身體操，喚醒全身能量吧！』", "衛寶熊")
+select("A. 迅速累積肌肉乳酸，讓大腦亢奮", warm_wrong, health, 0, "B. 喚醒身體「第二顆心臟」，排空疲勞毒素", warm_right, health, 25)
+
+bg("S__7766019.jpg")
+mes("衛寶熊：『暖身完成！現在我們要進入「淡大游泳館健身房」替戰衣補充能量！下肢、上肢與核心是防禦最核心的三個動力來源！』", "衛寶熊")
+select("A. 核心肌群負責保護脊椎與維持戰鬥姿勢", core_right, health, 25, "B. 核心純粹用來堆積游離糖精緻能量", core_wrong, health, 0)
+
+bg("S__7790597_0.jpg")
+mes("衛寶熊：『太好啦！戰衣已經完全充能。現在跟我來到「游泳館外的大平台廣場」。吹著晚風進行拉筋收操，啟動修復機制吧！』", "衛寶熊")
+select("A. 讓神經過度亢奮，徹底阻斷睡眠", cool_wrong, health, 0, "B. 加速帶走乳酸、分泌快樂荷爾蒙放鬆自律神經", cool_right, health, 25)
+
+bg("S__7806978.jpg")
+mes("衛寶熊：『經過暖身、肌力訓練與收操修復，防禦戰衣已完全啟動！疲勞病毒大魔王現身了，特務，發動全身防禦，反擊吧！』", "衛寶熊")
+end()
+
+kr_right:
+  bg("S__7790600_0.jpg")
+  mes("✓ 成功擊退坡道病毒！裂縫被綠色能量網完美修補好囉！", "衛寶熊")
+end_branch()
+kr_wrong:
+  mes("✗ 走入彎路！被疲勞病毒纏上消耗能量！核心穩定運動才能在疲累時維持戰衣能量喔！", "系統提示")
+end_branch()
+
+warm_right:
+  mes("✓ 答對了！血液循環泵浦全面開啟，順利過關！", "衛寶熊")
+end_branch()
+warm_wrong:
+  mes("✗ 姿勢不正確導致教練腳抽筋！暖身是為了喚醒第二顆心臟、排空疲勞残餘喔！", "衛寶熊")
+end_branch()
+
+core_right:
+  mes("✓ 完全正確！核心區域充能發光，解鎖全身防衛戰鬥姿勢！", "衛寶熊")
+end_branch()
+core_wrong:
+  mes("✗ 判定錯誤！核心肌肉是戰衣的中央穩定中樞，負責保護脊椎與維持姿態喔！", "衛寶熊")
+end_branch()
+
+cool_right:
+  mes("✓ 觀念太棒了！疲勞值大幅下降，大腦重新開機！", "衛寶熊")
+end_branch()
+cool_wrong:
+  mes("✗ 判定錯誤！運動後靜態拉筋收操，能加速帶走乳酸、分泌快樂荷爾蒙，並在夜間啟動完美的睡眠修復喔！", "衛寶熊")
+end_branch()
+`;
+
+// ═══════════════════════════════════════════
+//  INIT START
+// ═══════════════════════════════════════════
+document.getElementById('script-textarea').value = DEMO_SCRIPT;
+const _compiled = compileScript(DEMO_SCRIPT); gameScript = _compiled.cmds;
+window.addEventListener('resize', resizeCanvases); resizeCanvases();
+</script>
+</body>
+</html>
